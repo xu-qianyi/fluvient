@@ -189,7 +189,10 @@ export async function GET(req: Request, { params }: Params) {
 
   try {
     const raw = await YoutubeTranscript.fetchTranscript(videoId)
-    const items = splitAtEmbeddedSentences(raw)
+    const filtered = raw
+      .map((item) => ({ ...item, text: item.text.replace(/\[.*?\]/g, "").trim() }))
+      .filter((item) => item.text.length > 0)
+    const items = splitAtEmbeddedSentences(filtered)
     const grouped = groupIntoSegments(items, level)
     const segments = mergeShortSegments(grouped)
     return NextResponse.json({ segments })
