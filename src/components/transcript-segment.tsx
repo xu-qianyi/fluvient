@@ -29,7 +29,10 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
 
   return (
     <div
-      onClick={() => onSeek(startMs)}
+      onClick={() => {
+        if (window.getSelection()?.toString().trim()) return
+        onSeek(startMs)
+      }}
       className={cn(
         "group flex items-start gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer",
         isActive ? "bg-stone-100" : "hover:bg-stone-50"
@@ -37,7 +40,7 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
     >
       <button
         onClick={(e) => { e.stopPropagation(); onSeek(startMs) }}
-        className="shrink-0 mt-0.5 text-[11px] text-stone-400 hover:text-stone-900 font-mono tabular-nums transition-colors"
+        className="shrink-0 mt-0.5 text-[11px] text-stone-400 hover:text-stone-900 font-mono tabular-nums transition-colors select-none"
       >
         {formatTime(startMs)}
       </button>

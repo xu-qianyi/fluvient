@@ -7,9 +7,12 @@ import { useRouter } from "next/navigation"
 import { useYouTubePlayer } from "@/hooks/use-youtube-player"
 import { TranscriptSegment } from "@/components/transcript-segment"
 import { WordPopup } from "@/components/word-popup"
+import { SelectionPopup } from "@/components/selection-popup"
+import { ChatPanel, type ChatPanelHandle } from "@/components/chat-panel"
 import { tokenizeWithVocab } from "@/lib/vocab-highlight"
 import type { VocabTerm } from "@/app/api/vocab/[videoId]/route"
 import type { TranscriptSegment as Segment } from "@/app/api/transcript/[videoId]/route"
+import type { WordDefinition } from "@/app/api/definition/[word]/route"
 import { cn } from "@/lib/utils"
 
 type Tab = "transcript" | "notes" | "chat"
@@ -26,6 +29,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [transcriptError, setTranscriptError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [vocabTerms, setVocabTerms] = useState<VocabTerm[]>([])
+  const [vocabDefinitions, setVocabDefinitions] = useState<Map<string, WordDefinition>>(new Map())
   const [activeIdx, setActiveIdx] = useState(-1)
   const [activeTab, setActiveTab] = useState<Tab>("transcript")
   const [popup, setPopup] = useState<{
@@ -33,9 +37,11 @@ export function VideoLayout({ videoId }: { videoId: string }) {
     prefilled?: VocabTerm
     rect: DOMRect
   } | null>(null)
+  const [selectionPopup, setSelectionPopup] = useState<{ text: string; rect: DOMRect } | null>(null)
 
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([])
   const lastActiveIdx = useRef(-1)
+  const chatPanelRef = useRef<ChatPanelHandle>(null)
 
   const fetchTranscript = useCallback(() => {
     setSegments([])
@@ -64,6 +70,26 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   }, [fetchTranscript])
 
   useEffect(() => {
+    if (!vocabTerms.length) return
+    setVocabDefinitions(new Map())
+    Promise.all(
+      vocabTerms.map(async (t) => {
+        const lower = t.term.toLowerCase()
+        try {
+          const r = await fetch(`/api/definition/${encodeURIComponent(lower)}`)
+          const data: WordDefinition & { error?: string } = await r.json()
+          if (data.error) return null
+          return [lower, data] as [string, WordDefinition]
+        } catch {
+          return null
+        }
+      })
+    ).then((entries) => {
+      setVocabDefinitions(new Map(entries.filter((e): e is [string, WordDefinition] => e !== null)))
+    })
+  }, [vocabTerms])
+
+  useEffect(() => {
     if (!isReady || !segments.length) return
     const id = setInterval(() => {
       const ms = getCurrentTime() * 1000
@@ -82,24 +108,48 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const handleSeek = useCallback((ms: number) => seekTo(ms / 1000), [seekTo])
 
   const handleWordClick = useCallback((term: string, vocabTerm: VocabTerm, rect: DOMRect) => {
+    setSelectionPopup(null)
     setPopup({ term, prefilled: vocabTerm, rect })
   }, [])
+
+  const handleTranscriptMouseUp = useCallback(() => {
+    const selection = window.getSelection()
+    const text = selection?.toString().trim()
+    if (!text) { setSelectionPopup(null); return }
+    const range = selection!.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+    setSelectionPopup({ text, rect })
+  }, [])
+
+  const handleTranslate = useCallback((text: string) => {
+    setActiveTab("chat")
+    chatPanelRef.current?.sendMessage(`请将以下英文翻译成中文：\n"${text}"`)
+  }, [])
+
+  useEffect(() => { setSelectionPopup(null) }, [activeTab])
 
   const currentSeg = activeIdx >= 0 ? segments[activeIdx] : null
   const nextSeg = activeIdx >= 0 ? segments[activeIdx + 1] : null
 
   // Sort AI vocab: words before phrases
   const mergedVocab = useMemo(() => vocabTerms
-    .map((t) => ({
-      key: t.term.toLowerCase(),
-      content: t.term,
-      zh_definition: t.definition_zh,
-      pos: t.pos as string | undefined,
-      isPhrase: t.term.includes(" "),
-      example: null as string | null,
-    }))
+    .map((t) => {
+      const lower = t.term.toLowerCase()
+      const def = vocabDefinitions.get(lower)
+      return {
+        key: lower,
+        content: t.term,
+        zh_definition: t.definition_zh,
+        pos: t.pos as string | undefined,
+        isPhrase: t.term.includes(" "),
+        example: def?.example ?? null,
+        zh_example: def?.zh_example ?? null,
+      }
+    })
     .sort((a, b) => Number(a.isPhrase) - Number(b.isPhrase))
-  , [vocabTerms])
+  , [vocabTerms, vocabDefinitions])
+
+  const transcriptText = useMemo(() => segments.map((s) => s.text).join(" "), [segments])
 
   return (
     <>
@@ -205,7 +255,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           </div>
 
           {/* Transcript tab */}
-          <div className={cn("flex-1 overflow-y-auto px-2 py-2", activeTab !== "transcript" && "hidden")}>
+          <div onMouseUp={handleTranscriptMouseUp} className={cn("flex-1 overflow-y-auto px-2 py-2", activeTab !== "transcript" && "hidden")}>
             {!segments.length ? (
               <p className="text-sm text-stone-400 px-2 py-4">{t.watch.transcriptLoading}</p>
             ) : (
@@ -240,8 +290,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           </div>
 
           {/* Chat tab */}
-          <div className={cn("flex-1 overflow-y-auto p-4", activeTab !== "chat" && "hidden")}>
-            <p className="text-sm text-stone-400">AI 聊天即将上线</p>
+          <div className={cn("flex-1 min-h-0 flex flex-col", activeTab !== "chat" && "hidden")}>
+            <ChatPanel ref={chatPanelRef} transcript={transcriptText} />
           </div>
 
         </div>
@@ -253,6 +303,15 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           prefilled={popup.prefilled}
           anchorRect={popup.rect}
           onClose={() => setPopup(null)}
+        />
+      )}
+
+      {selectionPopup && (
+        <SelectionPopup
+          text={selectionPopup.text}
+          anchorRect={selectionPopup.rect}
+          onClose={() => setSelectionPopup(null)}
+          onTranslate={handleTranslate}
         />
       )}
     </>
@@ -317,13 +376,14 @@ type VocabListItem = {
   pos: string | undefined
   isPhrase: boolean
   example: string | null
+  zh_example: string | null
 }
 
 function VocabSection({ title, items }: { title: string; items: VocabListItem[] }) {
   if (items.length === 0) return null
   return (
     <div className="mb-1">
-      <p className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400">{title}</p>
+      <p className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-400 text-center">{title}</p>
       {items.map((item) => (
         <div key={item.key} className="px-3 py-2 rounded-lg hover:bg-stone-50">
           <div className="flex items-baseline gap-1.5 flex-wrap">
@@ -336,7 +396,12 @@ function VocabSection({ title, items }: { title: string; items: VocabListItem[] 
             )}
           </div>
           {item.example && (
-            <p className="text-xs text-stone-400 italic leading-snug mt-0.5 truncate">{item.example}</p>
+            <div className="mt-1 space-y-0.5">
+              <p className="text-xs text-stone-400 italic leading-snug">"{item.example}"</p>
+              {item.zh_example && (
+                <p className="text-xs text-stone-300 leading-snug">{item.zh_example}</p>
+              )}
+            </div>
           )}
         </div>
       ))}
