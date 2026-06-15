@@ -35,8 +35,6 @@ function tokenizeToChips(text: string, vocabTerms: VocabTerm[], cefrLevel: CefrL
   return chips
 }
 
-const translationCache = new Map<string, string>()
-
 type Tab = "transcript" | "notes" | "chat"
 
 const PLAYER_ID = "yt-player"
@@ -50,6 +48,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [segments, setSegments] = useState<Segment[]>([])
   const [transcriptError, setTranscriptError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [translations, setTranslations] = useState<Record<string, string>>({})
   const [vocabTerms, setVocabTerms] = useState<VocabTerm[]>([])
   const [vocabError, setVocabError] = useState(false)
   const [vocabLoading, setVocabLoading] = useState(false)
@@ -101,6 +100,26 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   useEffect(() => {
     fetchTranscript()
   }, [fetchTranscript])
+
+  useEffect(() => {
+    if (!segments.length) return
+    const unique = [...new Set(segments.map((s) => s.text))]
+    setTranslations({})
+    fetch("/api/translate-batch", {
+      method: "POST",
+      headers: withUserApiKey({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ texts: unique }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.translations) {
+          const map: Record<string, string> = {}
+          unique.forEach((text, i) => { if (data.translations[i]) map[text] = data.translations[i] })
+          setTranslations(map)
+        }
+      })
+      .catch(() => {})
+  }, [segments])
 
   useEffect(() => {
     if (!isReady || !segments.length) return
@@ -226,6 +245,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                     cefrLevel={cefrLevel}
                     onWordClick={handleWordClick}
                     size="current"
+                    translation={translations[currentSeg?.text ?? ""] ?? null}
                   />
                   {nextSeg && (
                     <LearningText
@@ -234,6 +254,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       cefrLevel={cefrLevel}
                       onWordClick={handleWordClick}
                       size="next"
+                      translation={null}
                     />
                   )}
                 </>
@@ -353,6 +374,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                         {selectedProvider === "openai" && <>从{" "}<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">OpenAI Platform</a>{" "}获取（按量付费）</>}
                         {selectedProvider === "anthropic" && <>从{" "}<a href="https://console.anthropic.com/settings/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Anthropic Console</a>{" "}获取（按量付费）</>}
                       </p>
+                      <p className="text-[11px] text-stone-400">Key 仅存在你的本地浏览器，仅用于转发 AI 请求，不会被存储或记录。</p>
                     </div>
                   )}
                 </div>
@@ -406,37 +428,17 @@ export function VideoLayout({ videoId }: { videoId: string }) {
 // ── Learning display text ────────────────────────────────────────────────────
 
 function LearningText({
-  text, vocabTerms, cefrLevel, onWordClick, size,
+  text, vocabTerms, cefrLevel, onWordClick, size, translation,
 }: {
   text: string
   vocabTerms: VocabTerm[]
   cefrLevel: CefrLevel
   onWordClick: (term: string, vocabTerm: VocabTerm | undefined, rect: DOMRect) => void
   size: "current" | "next"
+  translation: string | null
 }) {
   const chips = tokenizeToChips(text, vocabTerms, cefrLevel)
   const isCurrent = size === "current"
-  const [translation, setTranslation] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!isCurrent || !text) return
-    const cached = translationCache.get(text)
-    if (cached) { setTranslation(cached); return }
-    setTranslation(null)
-    fetch("/api/translate", {
-      method: "POST",
-      headers: withUserApiKey({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ text }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.translation) {
-          translationCache.set(text, data.translation)
-          setTranslation(data.translation)
-        }
-      })
-      .catch(() => {})
-  }, [text, isCurrent])
 
   return (
     <div className={cn("transition-all duration-300", !isCurrent && "opacity-30 pointer-events-none")}>
