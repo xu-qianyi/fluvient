@@ -93,24 +93,23 @@ export const ChatPanel = forwardRef<ChatPanelHandle, Props>(({ transcript }, ref
           <div className="space-y-3">
             {messages.map((msg, i) => (
               <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-                <div className={cn(
-                  "max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
-                  msg.role === "user"
-                    ? "bg-stone-900 text-white rounded-tr-md"
-                    : "bg-stone-100 text-stone-900 rounded-tl-md"
-                )}>
-                  {msg.content}
-                </div>
+                {msg.role === "user" ? (
+                  <div className="max-w-[88%] rounded-2xl rounded-tr-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-stone-200 text-stone-900">
+                    {msg.content}
+                  </div>
+                ) : (
+                  <div className="max-w-[92%] text-sm leading-relaxed whitespace-pre-wrap text-stone-800">
+                    {msg.content}
+                  </div>
+                )}
               </div>
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-stone-100 rounded-2xl rounded-tl-md px-4 py-3.5">
-                  <div className="flex gap-1 items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:300ms]" />
-                  </div>
+                <div className="flex gap-1 items-center py-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-400 animate-bounce [animation-delay:300ms]" />
                 </div>
               </div>
             )}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Languages, MessageSquare, PenLine } from "lucide-react"
+import { ExternalLink, Languages, MessageSquare, MoreVertical, PenLine, Trash2 } from "lucide-react"
 import { useLanguage } from "@/contexts/language-context"
 import { useRouter } from "next/navigation"
 import { useYouTubePlayer } from "@/hooks/use-youtube-player"
@@ -105,20 +105,39 @@ export function VideoLayout({ videoId }: { videoId: string }) {
     if (!segments.length) return
     const unique = [...new Set(segments.map((s) => s.text))]
     setTranslations({})
-    fetch("/api/translate-batch", {
-      method: "POST",
-      headers: withUserApiKey({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ texts: unique }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.translations) {
-          const map: Record<string, string> = {}
-          unique.forEach((text, i) => { if (data.translations[i]) map[text] = data.translations[i] })
-          setTranslations(map)
+
+    const CHUNK = 20
+    let cancelled = false
+
+    const run = async () => {
+      for (let i = 0; i < unique.length; i += CHUNK) {
+        if (cancelled) return
+        const batch = unique.slice(i, i + CHUNK)
+        try {
+          const r = await fetch("/api/translate-batch", {
+            method: "POST",
+            headers: withUserApiKey({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ texts: batch }),
+          })
+          const data = await r.json()
+          if (cancelled) return
+          if (data.translations) {
+            setTranslations((prev) => {
+              const next = { ...prev }
+              batch.forEach((text, j) => { if (data.translations[j]) next[text] = data.translations[j] })
+              return next
+            })
+          } else {
+            console.error("[translate-batch] chunk", i, "returned:", data)
+          }
+        } catch (err) {
+          console.error("[translate-batch] chunk", i, "failed:", err)
         }
-      })
-      .catch(() => {})
+      }
+    }
+
+    run()
+    return () => { cancelled = true }
   }, [segments])
 
   useEffect(() => {
@@ -161,7 +180,6 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   useEffect(() => { setSelectionPopup(null) }, [activeTab])
 
   const currentSeg = activeIdx >= 0 ? segments[activeIdx] : null
-  const nextSeg = activeIdx >= 0 ? segments[activeIdx + 1] : null
 
   // Sort AI vocab: words before phrases
   const mergedVocab = useMemo(() => vocabTerms
@@ -244,19 +262,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                     vocabTerms={vocabTerms}
                     cefrLevel={cefrLevel}
                     onWordClick={handleWordClick}
-                    size="current"
                     translation={translations[currentSeg?.text ?? ""] ?? null}
                   />
-                  {nextSeg && (
-                    <LearningText
-                      text={nextSeg.text}
-                      vocabTerms={vocabTerms}
-                      cefrLevel={cefrLevel}
-                      onWordClick={handleWordClick}
-                      size="next"
-                      translation={null}
-                    />
-                  )}
                 </>
               )}
             </div>
@@ -428,20 +435,18 @@ export function VideoLayout({ videoId }: { videoId: string }) {
 // ── Learning display text ────────────────────────────────────────────────────
 
 function LearningText({
-  text, vocabTerms, cefrLevel, onWordClick, size, translation,
+  text, vocabTerms, cefrLevel, onWordClick, translation,
 }: {
   text: string
   vocabTerms: VocabTerm[]
   cefrLevel: CefrLevel
   onWordClick: (term: string, vocabTerm: VocabTerm | undefined, rect: DOMRect) => void
-  size: "current" | "next"
   translation: string | null
 }) {
   const chips = tokenizeToChips(text, vocabTerms, cefrLevel)
-  const isCurrent = size === "current"
 
   return (
-    <div className={cn("transition-all duration-300", !isCurrent && "opacity-30 pointer-events-none")}>
+    <div>
       <div className="flex flex-wrap gap-1.5">
         {chips.map((chip, i) => (
           <button
@@ -461,7 +466,7 @@ function LearningText({
           </button>
         ))}
       </div>
-      {isCurrent && translation && (
+      {translation && (
         <p className="mt-3 text-sm text-stone-400 leading-relaxed">{translation}</p>
       )}
     </div>

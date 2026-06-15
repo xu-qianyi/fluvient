@@ -96,7 +96,11 @@ Analyze this video transcript and pick 10–15 words and phrases most worth lear
 Rules:
 - Mix BOTH single words (at least 5) AND multi-word phrases (at least 4). Do not return only phrases.
 - Single words: pick vocabulary that is useful but not too basic — words like "collagen", "inspire", "launch", "occasionally", "basically" are good candidates
-- Multi-word phrases: collocations and chunks like "get out of", "take a break", "in advance"
+- Multi-word phrases — include ALL of the following types that appear in the transcript:
+  1. Collocations & phrasal verbs: "take a break", "get out of", "look forward to"
+  2. Fixed adverbial expressions: "in advance", "as a result", "at this point", "in terms of", "when it comes to"
+  3. Common prepositional / structural phrases that Chinese learners often get wrong or find unnatural: "in this case", "on the other hand", "at the same time", "by the way"
+  4. Noun phrases with non-obvious combinations: "common misconception", "turning point", "key takeaway"
 - Each "term" must appear verbatim (case-insensitive) in the transcript
 - definition_zh should be natural Chinese, not a dictionary gloss
 
