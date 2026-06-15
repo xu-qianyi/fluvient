@@ -10,10 +10,32 @@ import { WordPopup } from "@/components/word-popup"
 import { SelectionPopup } from "@/components/selection-popup"
 import { ChatPanel, type ChatPanelHandle } from "@/components/chat-panel"
 import { tokenizeWithVocab } from "@/lib/vocab-highlight"
-import { getUserApiKey, setUserApiKey, withUserApiKey } from "@/lib/user-api-key"
+import { getUserApiKey, getUserApiProvider, setUserApi, withUserApiKey, type ApiProvider } from "@/lib/user-api-key"
 import type { VocabTerm } from "@/app/api/vocab/[videoId]/route"
 import type { TranscriptSegment as Segment } from "@/app/api/transcript/[videoId]/route"
+import type { CefrLevel } from "@/data/cefr-words"
 import { cn } from "@/lib/utils"
+
+// ── Chip tokenizer ────────────────────────────────────────────────────────────
+
+type WordChip = { text: string; vocabTerm?: VocabTerm }
+
+function tokenizeToChips(text: string, vocabTerms: VocabTerm[], cefrLevel: CefrLevel): WordChip[] {
+  const tokens = tokenizeWithVocab(text, vocabTerms, cefrLevel)
+  const chips: WordChip[] = []
+  for (const token of tokens) {
+    if (token.type === "vocab") {
+      chips.push({ text: token.text, vocabTerm: token.term })
+    } else {
+      for (const word of token.text.split(/\s+/).filter(Boolean)) {
+        chips.push({ text: word })
+      }
+    }
+  }
+  return chips
+}
+
+const translationCache = new Map<string, string>()
 
 type Tab = "transcript" | "notes" | "chat"
 
@@ -33,6 +55,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [vocabLoading, setVocabLoading] = useState(false)
   const [showKeyInput, setShowKeyInput] = useState(false)
   const [keyInputValue, setKeyInputValue] = useState(() => getUserApiKey() ?? "")
+  const [selectedProvider, setSelectedProvider] = useState<ApiProvider>(() => getUserApiProvider())
   const [activeIdx, setActiveIdx] = useState(-1)
   const [activeTab, setActiveTab] = useState<Tab>("transcript")
   const [popup, setPopup] = useState<{
@@ -97,7 +120,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
 
   const handleSeek = useCallback((ms: number) => seekTo(ms / 1000), [seekTo])
 
-  const handleWordClick = useCallback((term: string, vocabTerm: VocabTerm, rect: DOMRect) => {
+  const handleWordClick = useCallback((term: string, vocabTerm: VocabTerm | undefined, rect: DOMRect) => {
     setSelectionPopup(null)
     setPopup({ term, prefilled: vocabTerm, rect })
   }, [])
@@ -281,22 +304,42 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       onClick={() => setShowKeyInput(true)}
                       className="text-xs text-stone-400 hover:text-stone-600 underline underline-offset-2 transition-colors"
                     >
-                      使用自己的 Google AI API Key
+                      使用自己的 API Key
                     </button>
                   ) : (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs text-stone-400 text-left">粘贴你的 API Key（仅存在本地）</p>
+                    <div className="flex flex-col gap-2.5">
+                      <p className="text-xs text-stone-500 font-medium text-left">选择 AI 服务商</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(["google", "openai", "anthropic"] as ApiProvider[]).map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => { setSelectedProvider(p); setKeyInputValue("") }}
+                            className={cn(
+                              "py-1.5 rounded-lg text-xs font-medium border transition-colors",
+                              selectedProvider === p
+                                ? "bg-stone-900 text-white border-stone-900"
+                                : "border-stone-200 text-stone-500 hover:border-stone-400"
+                            )}
+                          >
+                            {p === "google" ? "Google" : p === "openai" ? "OpenAI" : "Anthropic"}
+                          </button>
+                        ))}
+                      </div>
                       <input
                         value={keyInputValue}
                         onChange={(e) => setKeyInputValue(e.target.value)}
-                        placeholder="AIza..."
+                        placeholder={
+                          selectedProvider === "openai" ? "sk-..." :
+                          selectedProvider === "anthropic" ? "sk-ant-..." :
+                          "AIza..."
+                        }
                         className="w-full text-xs bg-stone-100 rounded-lg px-3 py-2 outline-none font-mono placeholder:text-stone-300"
                       />
                       <button
                         onClick={() => {
                           const k = keyInputValue.trim()
                           if (!k) return
-                          setUserApiKey(k)
+                          setUserApi(k, selectedProvider)
                           setShowKeyInput(false)
                           fetchVocab()
                         }}
@@ -306,16 +349,9 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                         保存并重试
                       </button>
                       <p className="text-[11px] text-stone-400">
-                        从{" "}
-                        <a
-                          href="https://aistudio.google.com/apikey"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline underline-offset-2 hover:text-stone-600"
-                        >
-                          Google AI Studio
-                        </a>
-                        {" "}免费获取
+                        {selectedProvider === "google" && <>从{" "}<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Google AI Studio</a>{" "}免费获取</>}
+                        {selectedProvider === "openai" && <>从{" "}<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">OpenAI Platform</a>{" "}获取（按量付费）</>}
+                        {selectedProvider === "anthropic" && <>从{" "}<a href="https://console.anthropic.com/settings/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Anthropic Console</a>{" "}获取（按量付费）</>}
                       </p>
                     </div>
                   )}
@@ -351,6 +387,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           prefilled={popup.prefilled}
           anchorRect={popup.rect}
           onClose={() => setPopup(null)}
+          youtubeId={videoId}
         />
       )}
 
@@ -373,45 +410,59 @@ function LearningText({
 }: {
   text: string
   vocabTerms: VocabTerm[]
-  cefrLevel: import("@/data/cefr-words").CefrLevel
-  onWordClick: (term: string, vocabTerm: VocabTerm, rect: DOMRect) => void
+  cefrLevel: CefrLevel
+  onWordClick: (term: string, vocabTerm: VocabTerm | undefined, rect: DOMRect) => void
   size: "current" | "next"
 }) {
-  const tokens = tokenizeWithVocab(text, vocabTerms, cefrLevel)
+  const chips = tokenizeToChips(text, vocabTerms, cefrLevel)
   const isCurrent = size === "current"
+  const [translation, setTranslation] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isCurrent || !text) return
+    const cached = translationCache.get(text)
+    if (cached) { setTranslation(cached); return }
+    setTranslation(null)
+    fetch("/api/translate", {
+      method: "POST",
+      headers: withUserApiKey({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ text }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.translation) {
+          translationCache.set(text, data.translation)
+          setTranslation(data.translation)
+        }
+      })
+      .catch(() => {})
+  }, [text, isCurrent])
 
   return (
-    <p className={cn(
-      "leading-relaxed transition-all duration-300",
-      isCurrent ? "text-3xl font-medium text-stone-900" : "text-xl text-stone-300"
-    )}>
-      {tokens.map((token, i) => {
-        if (token.type === "text") return <span key={i}>{token.text}</span>
-        return (
+    <div className={cn("transition-all duration-300", !isCurrent && "opacity-30 pointer-events-none")}>
+      <div className="flex flex-wrap gap-1.5">
+        {chips.map((chip, i) => (
           <button
             key={i}
             onClick={(e) => {
-              if (!isCurrent) return
               e.stopPropagation()
-              onWordClick(token.text, token.term, (e.currentTarget as HTMLElement).getBoundingClientRect())
+              onWordClick(chip.text, chip.vocabTerm, (e.currentTarget as HTMLElement).getBoundingClientRect())
             }}
             className={cn(
-              "relative inline-block rounded-md transition-colors",
-              isCurrent
-                ? cn(
-                    "px-1 mx-0.5 cursor-pointer rounded",
-                    token.term.term.includes(" ")
-                      ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
-                      : "bg-blue-100 text-blue-900 hover:bg-blue-200"
-                  )
-                : "text-stone-300 cursor-default"
+              "rounded-md px-2 py-0.5 text-2xl font-medium transition-colors cursor-pointer",
+              chip.vocabTerm
+                ? "bg-stone-200 text-stone-800 hover:bg-stone-300"
+                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             )}
           >
-            {token.text}
+            {chip.text}
           </button>
-        )
-      })}
-    </p>
+        ))}
+      </div>
+      {isCurrent && translation && (
+        <p className="mt-3 text-sm text-stone-400 leading-relaxed">{translation}</p>
+      )}
+    </div>
   )
 }
 

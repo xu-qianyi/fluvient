@@ -1,7 +1,7 @@
 import { YoutubeTranscript } from "youtube-transcript"
 import { NextResponse } from "next/server"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { generateObject } from "ai"
+import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 
@@ -85,9 +85,8 @@ export async function GET(req: Request, { params }: Params) {
       .filter(Boolean)
       .join(" ")
 
-    const google = createGoogleGenerativeAI({ apiKey })
     const { object } = await generateObject({
-      model: google("gemini-2.5-flash"),
+      model: createModel(apiKey, getProviderFromHeader(req)),
       maxRetries: 0,
       schema,
       prompt: `You are an English teacher for Chinese learners at ${level.toUpperCase()} level.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { generateText } from "ai"
+import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
 
 interface ChatMessage {
   role: "user" | "assistant"
@@ -20,9 +20,8 @@ export async function POST(req: Request) {
   if (!apiKey) return NextResponse.json({ error: "no_api_key" }, { status: 503 })
 
   try {
-    const google = createGoogleGenerativeAI({ apiKey })
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: createModel(apiKey, getProviderFromHeader(req)),
       maxRetries: 0,
       system: `You are a helpful AI assistant built into an English learning app for Chinese speakers.
 The user is learning English by watching videos. Help them understand the content.

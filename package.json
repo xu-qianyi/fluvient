@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.84",
     "@ai-sdk/google": "^3.0.80",
+    "@ai-sdk/openai": "^3.0.71",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
     "ai": "^6.0.199",

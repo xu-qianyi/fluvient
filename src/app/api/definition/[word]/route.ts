@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { generateObject } from "ai"
+import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
 import { z } from "zod"
 
 export interface WordDefinition {
@@ -39,9 +39,8 @@ export async function GET(req: Request, { params }: Params) {
   }
 
   try {
-    const google = createGoogleGenerativeAI({ apiKey })
     const { object } = await generateObject({
-      model: google("gemini-2.5-flash"),
+      model: createModel(apiKey, getProviderFromHeader(req)),
       maxRetries: 0,
       schema,
       prompt: `You are a concise English-Chinese dictionary for Chinese learners of English.

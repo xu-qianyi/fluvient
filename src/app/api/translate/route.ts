@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { generateObject } from "ai"
+import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
 import { z } from "zod"
 
 export async function POST(req: Request) {
@@ -11,9 +11,8 @@ export async function POST(req: Request) {
   if (!apiKey) return NextResponse.json({ error: "no_api_key" }, { status: 503 })
 
   try {
-    const google = createGoogleGenerativeAI({ apiKey })
     const { object } = await generateObject({
-      model: google("gemini-2.5-flash"),
+      model: createModel(apiKey, getProviderFromHeader(req)),
       schema: z.object({
         translation: z.string().describe("natural Chinese translation of the input text"),
       }),
