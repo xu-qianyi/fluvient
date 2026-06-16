@@ -13,6 +13,8 @@ interface Props {
   cefrLevel: CefrLevel
   onSeek: (startMs: number) => void
   onWordClick: (term: string, vocabTerm: VocabTerm, rect: DOMRect) => void
+  searchQuery?: string
+  isCurrentMatch?: boolean
 }
 
 function formatTime(ms: number): string {
@@ -24,8 +26,23 @@ function formatTime(ms: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`
 }
 
-export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLevel, onSeek, onWordClick }: Props) {
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function highlightMatches(text: string, query: string): React.ReactNode {
+  const re = new RegExp(`(${escapeRegExp(query)})`, "gi")
+  const parts = text.split(re)
+  return parts.map((part, i) =>
+    i % 2 === 1
+      ? <mark key={i} className="bg-yellow-200 text-stone-900 rounded-sm">{part}</mark>
+      : part
+  )
+}
+
+export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLevel, onSeek, onWordClick, searchQuery, isCurrentMatch }: Props) {
   const tokens = tokenizeWithVocab(text, vocabTerms, cefrLevel)
+  const query = searchQuery?.trim() ?? ""
 
   return (
     <div
@@ -35,7 +52,8 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
       }}
       className={cn(
         "group flex items-start gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer",
-        isActive ? "bg-stone-100" : "hover:bg-stone-50"
+        isActive ? "bg-stone-100" : "hover:bg-stone-50",
+        isCurrentMatch && "ring-1 ring-amber-400"
       )}
     >
       <button
@@ -50,7 +68,7 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
         isActive ? "text-stone-900 font-medium" : "text-stone-500"
       )}>
         {tokens.map((token, i) => {
-          if (token.type === "text") return <span key={i}>{token.text}</span>
+          if (token.type === "text") return <span key={i}>{query ? highlightMatches(token.text, query) : token.text}</span>
           return (
             <button
               key={i}
@@ -65,7 +83,7 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
                   : "bg-blue-100 text-blue-900 hover:bg-blue-200"
               )}
             >
-              {token.text}
+              {query ? highlightMatches(token.text, query) : token.text}
             </button>
           )
         })}

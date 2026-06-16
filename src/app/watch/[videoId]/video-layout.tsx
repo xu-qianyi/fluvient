@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ExternalLink, Languages, MessageSquare, MoreVertical, PenLine, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, ExternalLink, Languages, MessageSquare, MoreVertical, PenLine, Search, Trash2, X } from "lucide-react"
 import { useLanguage } from "@/contexts/language-context"
 import { useRouter } from "next/navigation"
 import { useYouTubePlayer } from "@/hooks/use-youtube-player"
@@ -65,10 +65,14 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [selectionPopup, setSelectionPopup] = useState<{ text: string; rect: DOMRect } | null>(null)
   const [deletedVocabKeys, setDeletedVocabKeys] = useState<Set<string>>(new Set())
   const [loadingExampleKeys, setLoadingExampleKeys] = useState<Set<string>>(new Set())
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [matchIdx, setMatchIdx] = useState(0)
 
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([])
   const lastActiveIdx = useRef(-1)
   const chatPanelRef = useRef<ChatPanelHandle>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const fetchVocab = useCallback(() => {
     setVocabTerms([])
@@ -88,6 +92,9 @@ export function VideoLayout({ videoId }: { videoId: string }) {
     setSegments([])
     setTranscriptError(null)
     setIsLoading(true)
+    setSearchOpen(false)
+    setSearchQuery("")
+    setMatchIdx(0)
     fetch(`/api/transcript/${videoId}?level=${cefrLevel}`)
       .then((r) => r.json())
       .then((data) => {
@@ -180,6 +187,41 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   }, [])
 
   useEffect(() => { setSelectionPopup(null) }, [activeTab])
+
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return []
+    return segments.reduce<number[]>((acc, seg, i) => {
+      if (seg.text.toLowerCase().includes(q)) acc.push(i)
+      return acc
+    }, [])
+  }, [segments, searchQuery])
+
+  useEffect(() => { setMatchIdx(0) }, [searchQuery])
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  useEffect(() => {
+    if (!searchMatches.length) return
+    const idx = searchMatches[matchIdx]
+    segmentRefs.current[idx]?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [searchMatches, matchIdx])
+
+  const handleNextMatch = useCallback(() => {
+    setMatchIdx((i) => (searchMatches.length ? (i + 1) % searchMatches.length : 0))
+  }, [searchMatches.length])
+
+  const handlePrevMatch = useCallback(() => {
+    setMatchIdx((i) => (searchMatches.length ? (i - 1 + searchMatches.length) % searchMatches.length : 0))
+  }, [searchMatches.length])
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchQuery("")
+    setMatchIdx(0)
+  }, [])
 
   const currentSeg = activeIdx >= 0 ? segments[activeIdx] : null
 
@@ -325,11 +367,89 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           </div>
 
           {/* Transcript tab */}
-          <div onMouseUp={handleTranscriptMouseUp} className={cn("flex-1 overflow-y-auto px-2 py-2", activeTab !== "transcript" && "hidden")}>
+          <div onMouseUp={handleTranscriptMouseUp} className={cn("flex-1 overflow-y-auto", activeTab !== "transcript" && "hidden")}>
+            <div className="sticky top-0 z-10 bg-white px-2 pt-2 pb-2 flex justify-end">
+              <div className="relative group">
+                <div
+                  className={cn(
+                    "flex items-center rounded-xl overflow-hidden transition-all duration-300 ease-out",
+                    searchOpen ? "w-full gap-2 px-2 py-0.5" : "w-9 h-9 gap-0 px-0 py-0"
+                  )}
+                >
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    className={cn(
+                      "shrink-0 rounded-lg text-stone-400 transition-colors",
+                      searchOpen ? "p-1" : "p-1.5 hover:bg-stone-100 hover:text-stone-700"
+                    )}
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? handlePrevMatch() : handleNextMatch() }
+                      if (e.key === "Escape") handleCloseSearch()
+                    }}
+                    placeholder="Search transcript..."
+                    className={cn(
+                      "text-xs outline-none placeholder:text-stone-300 min-w-0 overflow-hidden",
+                      searchOpen ? "flex-1" : "w-0 grow-0 shrink-0"
+                    )}
+                    tabIndex={searchOpen ? 0 : -1}
+                  />
+                  <span className={cn(
+                    "text-xs text-stone-400 font-mono tabular-nums shrink-0 overflow-hidden",
+                    !searchOpen && "w-0"
+                  )}>
+                    {searchMatches.length === 0 ? "0/0" : `${matchIdx + 1}/${searchMatches.length}`}
+                  </span>
+                  <button
+                    onClick={handlePrevMatch}
+                    disabled={!searchMatches.length}
+                    tabIndex={searchOpen ? 0 : -1}
+                    className={cn(
+                      "rounded text-stone-400 hover:text-stone-700 disabled:opacity-30 transition-colors shrink-0 overflow-hidden",
+                      searchOpen ? "p-0.5" : "w-0 p-0"
+                    )}
+                  >
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={handleNextMatch}
+                    disabled={!searchMatches.length}
+                    tabIndex={searchOpen ? 0 : -1}
+                    className={cn(
+                      "rounded text-stone-400 hover:text-stone-700 disabled:opacity-30 transition-colors shrink-0 overflow-hidden",
+                      searchOpen ? "p-0.5" : "w-0 p-0"
+                    )}
+                  >
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={handleCloseSearch}
+                    tabIndex={searchOpen ? 0 : -1}
+                    className={cn(
+                      "rounded text-stone-400 hover:text-stone-700 transition-colors shrink-0 overflow-hidden",
+                      searchOpen ? "p-0.5" : "w-0 p-0"
+                    )}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {!searchOpen && (
+                  <span className="pointer-events-none absolute right-0 top-full mt-1.5 whitespace-nowrap rounded-md bg-stone-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-20">
+                    Search transcript
+                  </span>
+                )}
+              </div>
+            </div>
             {!segments.length ? (
               <p className="text-sm text-stone-400 px-2 py-4">{t.watch.transcriptLoading}</p>
             ) : (
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 px-2 pb-2">
                 {segments.map((seg, i) => (
                   <div key={i} ref={(el) => { segmentRefs.current[i] = el }}>
                     <TranscriptSegment
@@ -340,6 +460,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       cefrLevel={cefrLevel}
                       onSeek={handleSeek}
                       onWordClick={handleWordClick}
+                      searchQuery={searchQuery}
+                      isCurrentMatch={searchMatches.length > 0 && searchMatches[matchIdx] === i}
                     />
                   </div>
                 ))}
