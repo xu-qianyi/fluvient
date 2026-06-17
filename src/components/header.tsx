@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { LanguageSwitcher } from "./language-switcher"
+import { SettingsMenu } from "./settings-menu"
 import { useAuth } from "@/contexts/auth-context"
 
 export function Header() {
@@ -34,7 +34,7 @@ export function Header() {
       </Link>
 
       <div className="flex items-center gap-2">
-        <LanguageSwitcher />
+        <SettingsMenu />
 
         {/* Auth area */}
         {!loading && (
