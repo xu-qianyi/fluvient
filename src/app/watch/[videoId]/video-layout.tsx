@@ -11,7 +11,7 @@ import { SelectionPopup } from "@/components/selection-popup"
 import { ChatPanel, type ChatPanelHandle } from "@/components/chat-panel"
 import { tokenizeWithVocab } from "@/lib/vocab-highlight"
 import { getUserApiKey, getUserApiProvider, setUserApi, withUserApiKey, type ApiProvider } from "@/lib/user-api-key"
-import type { VocabTerm } from "@/app/api/vocab/[videoId]/route"
+import type { VocabTerm, ExpressionCard } from "@/app/api/vocab/[videoId]/route"
 import type { TranscriptSegment as Segment } from "@/app/api/transcript/[videoId]/route"
 import type { CefrLevel } from "@/data/cefr-words"
 import { cn } from "@/lib/utils"
@@ -41,8 +41,15 @@ const PLAYER_ID = "yt-player"
 const POLL_MS = 250
 
 export function VideoLayout({ videoId }: { videoId: string }) {
-  const { t, cefrLevel } = useLanguage()
+  const { t, cefrLevel, hydrated } = useLanguage()
   const router = useRouter()
+  // Token guardrail: AI vocab/transcript are generated per (video × level), so
+  // we pin the level at load time and DON'T react to live level changes. Editing
+  // the level mid-watch would otherwise re-generate everything at a new level.
+  // The new level applies on the next video instead.
+  const [appliedLevel, setAppliedLevel] = useState<CefrLevel>(cefrLevel)
+  const levelRef = useRef<CefrLevel>(cefrLevel)
+  const [dismissedForLevel, setDismissedForLevel] = useState<CefrLevel | null>(null)
   const { isReady, seekTo, getCurrentTime } = useYouTubePlayer(PLAYER_ID, videoId)
 
   const [segments, setSegments] = useState<Segment[]>([])
@@ -50,6 +57,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [isLoading, setIsLoading] = useState(true)
   const [translations, setTranslations] = useState<Record<string, string>>({})
   const [vocabTerms, setVocabTerms] = useState<VocabTerm[]>([])
+  const [expressions, setExpressions] = useState<ExpressionCard[]>([])
   const [vocabError, setVocabError] = useState(false)
   const [vocabLoading, setVocabLoading] = useState(false)
   const [showKeyInput, setShowKeyInput] = useState(false)
@@ -76,19 +84,28 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const chatPanelRef = useRef<ChatPanelHandle>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Keep the ref in sync, but reads of it (in the fetches below) are deliberately
+  // decoupled from re-renders so a live level change won't trigger a re-fetch.
+  useEffect(() => {
+    levelRef.current = cefrLevel
+  }, [cefrLevel])
+
   const fetchVocab = useCallback(() => {
     setVocabTerms([])
+    setExpressions([])
     setVocabError(false)
     setVocabLoading(true)
-    fetch(`/api/vocab/${videoId}?level=${cefrLevel}`, { headers: withUserApiKey() })
+    fetch(`/api/vocab/${videoId}?level=${levelRef.current}`, { headers: withUserApiKey() })
       .then((r) => r.json())
       .then((data) => {
-        if (data.terms) setVocabTerms(data.terms)
-        else setVocabError(true)
+        if (data.terms) {
+          setVocabTerms(data.terms)
+          setExpressions(data.expressions ?? [])
+        } else setVocabError(true)
       })
       .catch(() => setVocabError(true))
       .finally(() => setVocabLoading(false))
-  }, [videoId, cefrLevel])
+  }, [videoId])
 
   const fetchTranscript = useCallback(() => {
     setSegments([])
@@ -99,7 +116,9 @@ export function VideoLayout({ videoId }: { videoId: string }) {
     setSearchOpen(false)
     setSearchQuery("")
     setMatchIdx(0)
-    fetch(`/api/transcript/${videoId}?level=${cefrLevel}`)
+    // Pin this load to the level current at fetch time.
+    setAppliedLevel(levelRef.current)
+    fetch(`/api/transcript/${videoId}?level=${levelRef.current}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setTranscriptError(data.error)
@@ -112,11 +131,15 @@ export function VideoLayout({ videoId }: { videoId: string }) {
       })
       .catch(() => setTranscriptError("fetch_failed"))
       .finally(() => setIsLoading(false))
-  }, [videoId, cefrLevel, fetchVocab])
+  }, [videoId, fetchVocab])
 
+  // Fires on first load (once localStorage has hydrated, so we use the stored
+  // level — not the transient default) and whenever the video changes. Crucially
+  // it does NOT depend on cefrLevel, so changing the level mid-watch is free.
   useEffect(() => {
+    if (!hydrated) return
     fetchTranscript()
-  }, [fetchTranscript])
+  }, [hydrated, fetchTranscript])
 
   // On-demand translation: only translate the segment being played, plus a small
   // lookahead. The center "learning display" is the sole consumer, and it shows
@@ -273,8 +296,26 @@ export function VideoLayout({ videoId }: { videoId: string }) {
 
   const transcriptText = useMemo(() => segments.map((s) => s.text).join(" "), [segments])
 
+  const showLevelNotice =
+    !isLoading && !transcriptError && cefrLevel !== appliedLevel && dismissedForLevel !== cefrLevel
+
   return (
     <>
+      {/* Level-changed-mid-watch hint (token guardrail: applies on next video) */}
+      {showLevelNotice && (
+        <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs text-stone-600 shadow-lg">
+          <span>
+            等级已切换为 <span className="font-semibold uppercase">{cefrLevel}</span>，将在下个视频生效
+          </span>
+          <button
+            onClick={() => setDismissedForLevel(cefrLevel)}
+            className="text-stone-400 hover:text-stone-600 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Full-screen loading overlay */}
       {isLoading && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white gap-5">
@@ -342,7 +383,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                   <LearningText
                     text={currentSeg?.text ?? ""}
                     vocabTerms={vocabTerms}
-                    cefrLevel={cefrLevel}
+                    cefrLevel={appliedLevel}
                     onWordClick={handleWordClick}
                     translation={translations[currentSeg?.text ?? ""] ?? null}
                   />
@@ -364,7 +405,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
               </TabBtn>
               <TabBtn active={activeTab === "notes"} onClick={() => setActiveTab("notes")}>
                 <PenLine className="w-3.5 h-3.5" />
-                生词本
+                随学卡
               </TabBtn>
               <TabBtn active={activeTab === "chat"} onClick={() => setActiveTab("chat")}>
                 <MessageSquare className="w-3.5 h-3.5" />
@@ -576,6 +617,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                 )}
                 <VocabSection title="Vocabulary" items={filteredVocab.filter((i) => !i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
                 <VocabSection title="Short Phrases" items={filteredVocab.filter((i) => i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
+                <ExpressionSection expressions={expressions} segments={segments} onSeek={handleSeek} hideTranslation={hideTranslation} />
               </>
             )}
           </div>
@@ -655,6 +697,87 @@ function LearningText({
       </div>
       {translation && (
         <p className="mt-3 text-base text-stone-400 leading-relaxed">{translation}</p>
+      )}
+    </div>
+  )
+}
+
+// ── 表达锦囊 (functional expressions) ─────────────────────────────────────────
+
+// Resolve a video_quote to a playback position by finding the transcript
+// segment that contains it. Falls back to matching the quote's first few words
+// (segmentation differs per level, so an exact whole-quote match isn't given).
+function findSegmentStart(quote: string, segments: Segment[]): number | null {
+  const q = quote.toLowerCase().trim().replace(/\s+/g, " ")
+  if (!q) return null
+  const exact = segments.find((s) => s.text.toLowerCase().replace(/\s+/g, " ").includes(q))
+  if (exact) return exact.startMs
+  const head = q.split(" ").slice(0, 6).join(" ")
+  const partial = segments.find((s) => s.text.toLowerCase().replace(/\s+/g, " ").includes(head))
+  return partial ? partial.startMs : null
+}
+
+function ExpressionSection({ expressions, segments, onSeek, hideTranslation }: {
+  expressions: ExpressionCard[]
+  segments: Segment[]
+  onSeek: (ms: number) => void
+  hideTranslation: boolean
+}) {
+  if (!expressions.length) return null
+  return (
+    <div className="mt-2 border-t border-stone-100 pt-1">
+      <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 text-center">表达锦囊</p>
+      {expressions.map((exp, i) => (
+        <ExpressionCardItem key={i} exp={exp} segments={segments} onSeek={onSeek} hideTranslation={hideTranslation} />
+      ))}
+    </div>
+  )
+}
+
+function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
+  exp: ExpressionCard
+  segments: Segment[]
+  onSeek: (ms: number) => void
+  hideTranslation: boolean
+}) {
+  const startMs = useMemo(() => findSegmentStart(exp.video_quote, segments), [exp.video_quote, segments])
+  const canJump = startMs != null
+
+  return (
+    <div className="mx-3 mb-2 rounded-xl bg-stone-50 px-4 py-3">
+      <p className="text-xs font-medium text-stone-500">{exp.scenario_zh}</p>
+      <p className="mt-1 text-sm font-semibold text-stone-900">{exp.pattern}</p>
+
+      {/* video original sentence — green underline, click to jump */}
+      <button
+        type="button"
+        disabled={!canJump}
+        onClick={() => canJump && onSeek(startMs!)}
+        title={canJump ? "跳转到视频此处" : undefined}
+        className={cn(
+          "mt-2 block text-left text-sm italic leading-snug underline decoration-2 underline-offset-2",
+          canJump
+            ? "text-stone-600 decoration-green-500 hover:decoration-green-600 cursor-pointer"
+            : "text-stone-500 decoration-stone-300 cursor-default"
+        )}
+      >
+        &ldquo;{exp.video_quote}&rdquo;
+      </button>
+
+      {exp.transfers?.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">换个场景也能用</p>
+          {exp.transfers.map((tr, i) => (
+            <div key={i} className="leading-snug">
+              <p className="text-xs text-stone-600">{tr.en}</p>
+              <p className={cn("text-xs text-stone-400", hideTranslation && "blur-sm select-none")}>{tr.zh}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {exp.register_zh && (
+        <p className="mt-3 text-xs text-stone-400 leading-snug">💡 {exp.register_zh}</p>
       )}
     </div>
   )
