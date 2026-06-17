@@ -518,7 +518,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           </div>
 
           {/* 生词本 tab */}
-          <div className={cn("flex-1 overflow-y-auto py-2", activeTab !== "notes" && "hidden")}>
+          <div className={cn("flex-1 overflow-y-auto pb-2", activeTab !== "notes" && "hidden")}>
             {vocabError ? (
               <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
                 <p className="text-sm text-stone-500">{t.watch.vocabFailed}</p>
@@ -600,7 +600,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
             ) : (
               <>
                 {filteredVocab.length > 0 && (
-                  <div className="sticky top-0 z-10 bg-white px-3 pb-1 flex justify-end">
+                  <div className="sticky top-0 z-10 bg-white px-3 pt-2 pb-1 flex justify-end">
                     <button
                       onClick={() => setHideTranslation((v) => !v)}
                       className={cn(
