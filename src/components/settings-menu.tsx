@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 // next one (see the guardrail in video-layout).
 export function SettingsMenu() {
   const { user, showAuthModal } = useAuth()
-  const { locale, setLocale, cefrLevel, setCefrLevel, nativeLanguage, setNativeLanguage } = useLanguage()
+  const { locale, setLocale, cefrLevel, setCefrLevel, nativeLanguage, setNativeLanguage, t } = useLanguage()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -31,7 +31,7 @@ export function SettingsMenu() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 h-8 px-2.5 rounded-md text-sm text-stone-600 hover:bg-stone-100 transition-colors"
-        title={locale === "zh" ? "学习设置" : "Learning settings"}
+        title={t.settings.title}
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
         <span className="text-xs font-semibold uppercase">{cefrLevel}</span>
@@ -41,7 +41,7 @@ export function SettingsMenu() {
         <div className="absolute right-0 mt-1 w-64 rounded-lg border border-stone-200 bg-white shadow-sm p-2 z-50">
           {/* Level */}
           <p className="px-2 pt-1 pb-1.5 text-xs font-semibold text-stone-500">
-            {locale === "zh" ? "英语水平" : "English level"}
+            {t.settings.englishLevel}
           </p>
           <div className="space-y-0.5">
             {CEFR_LEVELS.map((l) => (
@@ -64,7 +64,7 @@ export function SettingsMenu() {
 
           {/* Interface language */}
           <p className="px-2 pt-3 pb-1.5 text-xs font-semibold text-stone-500">
-            {locale === "zh" ? "界面语言" : "Language"}
+            {t.settings.appLanguage}
           </p>
           <div className="space-y-0.5">
             {locales.map((l) => (
@@ -88,7 +88,7 @@ export function SettingsMenu() {
           {/* Translation language — only Chinese is wired up in the backend
               today; the rest are placeholders to signal the roadmap. */}
           <p className="px-2 pt-3 pb-1.5 text-xs font-semibold text-stone-500">
-            {locale === "zh" ? "释义语言" : "Translation language"}
+            {t.settings.translationLanguage}
           </p>
           <div className="space-y-0.5">
             {NATIVE_LANGUAGES.map((lang) => (
@@ -110,7 +110,7 @@ export function SettingsMenu() {
                 )}
                 {!lang.active && (
                   <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-400">
-                    {locale === "zh" ? "即将支持" : "Soon"}
+                    {t.settings.soon}
                   </span>
                 )}
               </button>
@@ -127,7 +127,7 @@ export function SettingsMenu() {
                 }}
                 className="w-full rounded-md px-2 py-1.5 text-left text-xs text-stone-500 hover:bg-stone-50 transition-colors"
               >
-                {locale === "zh" ? "登录以跨设备保存设置 →" : "Log in to save across devices →"}
+                {t.settings.loginToSave}
               </button>
             </div>
           )}

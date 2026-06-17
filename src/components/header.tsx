@@ -4,9 +4,11 @@ import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { SettingsMenu } from "./settings-menu"
 import { useAuth } from "@/contexts/auth-context"
+import { useLanguage } from "@/contexts/language-context"
 
 export function Header() {
   const { user, loading, signOut, showAuthModal } = useAuth()
+  const { t } = useLanguage()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -58,14 +60,14 @@ export function Header() {
                       onClick={() => setDropdownOpen(false)}
                       className="flex w-full items-center px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
                     >
-                      缓存后台
+                      {t.header.cacheAdmin}
                     </Link>
                   )}
                   <button
                     onClick={() => { setDropdownOpen(false); signOut() }}
                     className="flex w-full items-center px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
                   >
-                    退出登录
+                    {t.header.logOut}
                   </button>
                 </div>
               )}
@@ -75,7 +77,7 @@ export function Header() {
               onClick={showAuthModal}
               className="h-8 px-3 rounded-md text-sm font-medium text-stone-600 hover:bg-stone-100 transition-colors"
             >
-              登录
+              {t.header.logIn}
             </button>
           )
         )}

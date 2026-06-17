@@ -35,6 +35,7 @@ export function Onboarding() {
     cefrLevel,
     setCefrLevel,
     markOnboarded,
+    t,
   } = useLanguage()
 
   const [step, setStep] = useState(0)
@@ -67,7 +68,7 @@ export function Onboarding() {
           onClick={finish}
           className="absolute right-5 top-5 text-xs text-stone-400 hover:text-stone-600 transition-colors"
         >
-          {locale === "zh" ? "跳过" : "Skip"}
+          {t.onboarding.skip}
         </button>
 
         {/* Progress dots */}
@@ -87,12 +88,10 @@ export function Onboarding() {
         {step === 0 && (
           <div>
             <h2 className="text-lg font-semibold text-stone-900">
-              {locale === "zh" ? "你想用哪种语言？" : "Which language do you prefer?"}
+              {t.onboarding.langTitle}
             </h2>
             <p className="mt-1 text-sm text-stone-500">
-              {locale === "zh"
-                ? "应用界面将使用这种语言，随时可在设置里更改。"
-                : "The app will be shown in this language. You can change it anytime in settings."}
+              {t.onboarding.langDesc}
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -118,7 +117,7 @@ export function Onboarding() {
               onClick={() => setStep(1)}
               className="mt-5 h-11 w-full rounded-lg bg-stone-900 text-sm font-medium text-white hover:bg-stone-700 transition-colors"
             >
-              {locale === "zh" ? "继续" : "Continue"}
+              {t.onboarding.continue}
             </button>
           </div>
         )}
@@ -127,12 +126,10 @@ export function Onboarding() {
         {step === 1 && (
           <div>
             <h2 className="text-lg font-semibold text-stone-900">
-              {locale === "zh" ? "你的英语水平是？" : "What's your English level?"}
+              {t.onboarding.levelTitle}
             </h2>
             <p className="mt-1 text-sm text-stone-500">
-              {locale === "zh"
-                ? "我们会按你的水平挑选合适难度的视频和词汇。"
-                : "We'll match video difficulty and vocabulary to your level."}
+              {t.onboarding.levelDesc}
             </p>
 
             <div className="mt-4 space-y-2">
@@ -170,7 +167,7 @@ export function Onboarding() {
               rel="noopener noreferrer"
               className="mt-3 inline-flex items-center gap-1 text-xs text-stone-400 hover:text-stone-600 transition-colors"
             >
-              {locale === "zh" ? "不确定？做个免费测试" : "Not sure? Take a free test"}
+              {t.onboarding.notSureTest}
               <ExternalLink className="h-3 w-3" />
             </a>
 
@@ -179,13 +176,13 @@ export function Onboarding() {
                 onClick={() => setStep(0)}
                 className="h-11 rounded-lg border border-stone-200 px-4 text-sm font-medium text-stone-600 hover:bg-stone-50 transition-colors"
               >
-                {locale === "zh" ? "返回" : "Back"}
+                {t.onboarding.back}
               </button>
               <button
                 onClick={() => setStep(2)}
                 className="h-11 flex-1 rounded-lg bg-stone-900 text-sm font-medium text-white hover:bg-stone-700 transition-colors"
               >
-                {locale === "zh" ? "继续" : "Continue"}
+                {t.onboarding.continue}
               </button>
             </div>
           </div>
@@ -195,25 +192,23 @@ export function Onboarding() {
         {step === 2 && (
           <div>
             <h2 className="text-lg font-semibold text-stone-900">
-              {locale === "zh" ? "登录以保存你的设置" : "Log in to save your settings"}
+              {t.onboarding.loginTitle}
             </h2>
             <p className="mt-1 text-sm text-stone-500">
-              {locale === "zh"
-                ? "登录后，你的水平和收藏会同步到所有设备。不登录也能直接开始学习。"
-                : "Sign in to sync your level and saved words across devices. Or just start learning."}
+              {t.onboarding.loginDesc}
             </p>
 
             <button
               onClick={loginAndSave}
               className="mt-5 h-11 w-full rounded-lg bg-stone-900 text-sm font-medium text-white hover:bg-stone-700 transition-colors"
             >
-              {locale === "zh" ? "登录并保存" : "Log in & save"}
+              {t.onboarding.loginAndSave}
             </button>
             <button
               onClick={finish}
               className="mt-2 h-11 w-full rounded-lg text-sm font-medium text-stone-500 hover:bg-stone-50 transition-colors"
             >
-              {locale === "zh" ? "稍后再说，开始学习" : "Maybe later, start learning"}
+              {t.onboarding.maybeLater}
             </button>
           </div>
         )}

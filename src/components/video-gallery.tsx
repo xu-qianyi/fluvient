@@ -16,7 +16,7 @@ export interface GalleryVideo {
 const ORDER = ["a1", "a2", "b1", "b2", "c1"]
 
 export function VideoGallery({ videos }: { videos: GalleryVideo[] }) {
-  const { cefrLevel, hydrated } = useLanguage()
+  const { cefrLevel, hydrated, t } = useLanguage()
   // Everyone now has a meaningful level (from onboarding / localStorage), so we
   // filter by it for logged-in and anonymous users alike. Runs after hydration
   // to use the stored level and avoid an SSR/hydration mismatch.
@@ -36,7 +36,7 @@ export function VideoGallery({ videos }: { videos: GalleryVideo[] }) {
   return (
     <section className="max-w-5xl mx-auto w-full pb-16">
       <h2 className="text-sm font-semibold text-stone-700 mb-3">
-        适合你水平的视频
+        {t.gallery.recommended}
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {shown.map((v) => (
