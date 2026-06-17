@@ -15,6 +15,7 @@ interface Props {
   onWordClick: (term: string, vocabTerm: VocabTerm, rect: DOMRect) => void
   searchQuery?: string
   isCurrentMatch?: boolean
+  isQuoted?: boolean
 }
 
 function formatTime(ms: number): string {
@@ -40,7 +41,7 @@ function highlightMatches(text: string, query: string): React.ReactNode {
   )
 }
 
-export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLevel, onSeek, onWordClick, searchQuery, isCurrentMatch }: Props) {
+export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLevel, onSeek, onWordClick, searchQuery, isCurrentMatch, isQuoted }: Props) {
   const tokens = tokenizeWithVocab(text, vocabTerms, cefrLevel)
   const query = searchQuery?.trim() ?? ""
 
@@ -52,7 +53,7 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
       }}
       className={cn(
         "group flex items-start gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer",
-        isActive ? "bg-stone-100" : "hover:bg-stone-50",
+        isQuoted ? "bg-green-50" : isActive ? "bg-stone-100" : "hover:bg-stone-50",
         isCurrentMatch && "ring-1 ring-amber-400"
       )}
     >
@@ -65,7 +66,8 @@ export function TranscriptSegment({ text, startMs, isActive, vocabTerms, cefrLev
 
       <p className={cn(
         "text-sm leading-relaxed",
-        isActive ? "text-stone-900 font-medium" : "text-stone-500"
+        isActive ? "text-stone-900 font-medium" : "text-stone-500",
+        isQuoted && "underline decoration-green-500 decoration-2 underline-offset-2"
       )}>
         {tokens.map((token, i) => {
           if (token.type === "text") return <span key={i}>{query ? highlightMatches(token.text, query) : token.text}</span>

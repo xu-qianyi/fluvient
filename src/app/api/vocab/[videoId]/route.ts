@@ -42,7 +42,7 @@ const schema = z.object({
   expressions: z.array(z.object({
     scenario_zh: z.string().describe("the real-life communicative scenario in natural Chinese, e.g. 夸别人事情做得漂亮"),
     pattern: z.string().describe("a reusable sentence frame with a ___ slot, e.g. 'You did a great job (on ___).'"),
-    video_quote: z.string().describe("the EXACT sentence from the transcript (verbatim, must be a case-insensitive substring of it) where this expression appears"),
+    video_quote: z.string().describe("ONE short sentence (≤ 25 words) copied verbatim from the transcript (must be a case-insensitive substring of it) — the single sentence where this expression appears. Never multiple sentences or a paragraph."),
     transfers: z.array(z.object({
       en: z.string().describe("a natural English sentence applying the SAME expression in a DIFFERENT everyday scenario"),
       zh: z.string().describe("Chinese translation of the English sentence"),
@@ -155,7 +155,7 @@ Rules:
 Also pick 3 FUNCTIONAL EXPRESSIONS for "expressions" — useful "chunks" organized by communicative INTENT (e.g. praising someone, declining politely, expressing surprise, making a suggestion) that a learner should learn to actively USE, not just recognize. For each:
 - scenario_zh: the real-life situation in natural Chinese
 - pattern: a reusable sentence frame with a ___ slot (not a fixed sentence)
-- video_quote: the EXACT sentence from the transcript (verbatim, case-insensitive substring) where this expression is used
+- video_quote: the EXACT single sentence from the transcript (verbatim, case-insensitive substring) where this expression is used — ONE sentence only (≤ 25 words), never a paragraph or multiple sentences
 - transfers: 1–2 example sentences that apply the SAME expression in a DIFFERENT everyday scenario, each with a Chinese translation
 - register_zh: a short note on tone/formality and who you'd say it to
 Pick expressions that are genuinely transferable and high-value — quality over quantity.

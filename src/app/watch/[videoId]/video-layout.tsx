@@ -9,6 +9,7 @@ import { TranscriptSegment } from "@/components/transcript-segment"
 import { WordPopup } from "@/components/word-popup"
 import { SelectionPopup } from "@/components/selection-popup"
 import { ChatPanel, type ChatPanelHandle } from "@/components/chat-panel"
+import { Footer } from "@/components/footer"
 import { tokenizeWithVocab } from "@/lib/vocab-highlight"
 import { getUserApiKey, getUserApiProvider, setUserApi, withUserApiKey, type ApiProvider } from "@/lib/user-api-key"
 import type { VocabTerm, ExpressionCard } from "@/app/api/vocab/[videoId]/route"
@@ -77,6 +78,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [matchIdx, setMatchIdx] = useState(0)
   const [hideTranslation, setHideTranslation] = useState(false)
+  // Segment highlighted green when the learner jumps here from a 表达锦囊 card.
+  const [quotedIdx, setQuotedIdx] = useState<number | null>(null)
 
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([])
   const inFlightTranslations = useRef<Set<string>>(new Set())
@@ -188,7 +191,23 @@ export function VideoLayout({ videoId }: { videoId: string }) {
     segmentRefs.current[activeIdx]?.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [activeIdx])
 
-  const handleSeek = useCallback((ms: number) => seekTo(ms / 1000), [seekTo])
+  // Scroll the green-highlighted 表达锦囊 sentence into view once the transcript
+  // tab is actually visible (scrollIntoView is a no-op while it's display:none).
+  useEffect(() => {
+    if (quotedIdx == null || activeTab !== "transcript") return
+    segmentRefs.current[quotedIdx]?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [quotedIdx, activeTab])
+
+  // Manual transcript clicks clear any 表达锦囊 green highlight.
+  const handleSeek = useCallback((ms: number) => { setQuotedIdx(null); seekTo(ms / 1000) }, [seekTo])
+
+  // Jump here from a 表达锦囊 card: switch to the transcript, seek the video,
+  // and green-highlight the matched sentence so the learner can locate it.
+  const handleExpressionJump = useCallback((idx: number, ms: number) => {
+    setActiveTab("transcript")
+    setQuotedIdx(idx)
+    seekTo(ms / 1000)
+  }, [seekTo])
 
   const handleWordClick = useCallback((term: string, vocabTerm: VocabTerm | undefined, rect: DOMRect) => {
     setSelectionPopup(null)
@@ -361,7 +380,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 gap-4 px-20 py-6 bg-stone-100/60">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-stone-100/60">
+        <div className="h-full flex gap-4 px-20 py-6">
 
         {/* ── Left column ── */}
         <div className="flex flex-col w-2/3 min-h-0 gap-4">
@@ -510,6 +530,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       onWordClick={handleWordClick}
                       searchQuery={searchQuery}
                       isCurrentMatch={searchMatches.length > 0 && searchMatches[matchIdx] === i}
+                      isQuoted={quotedIdx === i}
                     />
                   </div>
                 ))}
@@ -617,7 +638,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                 )}
                 <VocabSection title={t.watch.vocabularyHeading} items={filteredVocab.filter((i) => !i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
                 <VocabSection title={t.watch.shortPhrasesHeading} items={filteredVocab.filter((i) => i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
-                <ExpressionSection expressions={expressions} segments={segments} onSeek={handleSeek} hideTranslation={hideTranslation} />
+                <ExpressionSection expressions={expressions} segments={segments} onJump={handleExpressionJump} hideTranslation={hideTranslation} />
               </>
             )}
           </div>
@@ -628,6 +649,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           </div>
 
         </div>
+        </div>
+        <Footer />
       </div>
 
       {popup && (
@@ -704,23 +727,45 @@ function LearningText({
 
 // ── 表达锦囊 (functional expressions) ─────────────────────────────────────────
 
-// Resolve a video_quote to a playback position by finding the transcript
-// segment that contains it. Falls back to matching the quote's first few words
-// (segmentation differs per level, so an exact whole-quote match isn't given).
-function findSegmentStart(quote: string, segments: Segment[]): number | null {
+// Resolve a video_quote to the transcript segment that contains it. Falls back
+// to matching the quote's first few words (segmentation differs per level, so an
+// exact whole-quote match isn't given). Returns the segment index, or null.
+function findSegmentIndex(quote: string, segments: Segment[]): number | null {
   const q = quote.toLowerCase().trim().replace(/\s+/g, " ")
   if (!q) return null
-  const exact = segments.find((s) => s.text.toLowerCase().replace(/\s+/g, " ").includes(q))
-  if (exact) return exact.startMs
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ")
+  let idx = segments.findIndex((s) => norm(s.text).includes(q))
+  if (idx >= 0) return idx
   const head = q.split(" ").slice(0, 6).join(" ")
-  const partial = segments.find((s) => s.text.toLowerCase().replace(/\s+/g, " ").includes(head))
-  return partial ? partial.startMs : null
+  idx = segments.findIndex((s) => norm(s.text).includes(head))
+  return idx >= 0 ? idx : null
 }
 
-function ExpressionSection({ expressions, segments, onSeek, hideTranslation }: {
+// The AI is asked for the single sentence where an expression appears, but it
+// sometimes returns a whole paragraph. Show only the one sentence that contains
+// the expression (matched via the pattern's literal text), falling back to the
+// first sentence — so the card stays a tidy single line, not a wall of text.
+function extractQuoteSentence(quote: string, pattern: string): string {
+  const clean = quote.trim().replace(/\s+/g, " ")
+  const sentences = (clean.match(/[^.!?]+[.!?]*/g) ?? [clean]).map((s) => s.trim()).filter(Boolean)
+  if (sentences.length <= 1) return clean
+  // needle = the longest literal fragment of the pattern around its ___ slot
+  const needle = pattern
+    .split(/_+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)[0]
+  if (needle) {
+    const hit = sentences.find((s) => s.toLowerCase().includes(needle.toLowerCase()))
+    if (hit) return hit
+  }
+  return sentences[0]
+}
+
+function ExpressionSection({ expressions, segments, onJump, hideTranslation }: {
   expressions: ExpressionCard[]
   segments: Segment[]
-  onSeek: (ms: number) => void
+  onJump: (idx: number, ms: number) => void
   hideTranslation: boolean
 }) {
   const { t } = useLanguage()
@@ -729,21 +774,22 @@ function ExpressionSection({ expressions, segments, onSeek, hideTranslation }: {
     <div className="mt-2 border-t border-stone-100 pt-1">
       <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 text-center">{t.watch.expressionTips}</p>
       {expressions.map((exp, i) => (
-        <ExpressionCardItem key={i} exp={exp} segments={segments} onSeek={onSeek} hideTranslation={hideTranslation} />
+        <ExpressionCardItem key={i} exp={exp} segments={segments} onJump={onJump} hideTranslation={hideTranslation} />
       ))}
     </div>
   )
 }
 
-function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
+function ExpressionCardItem({ exp, segments, onJump, hideTranslation }: {
   exp: ExpressionCard
   segments: Segment[]
-  onSeek: (ms: number) => void
+  onJump: (idx: number, ms: number) => void
   hideTranslation: boolean
 }) {
   const { t } = useLanguage()
-  const startMs = useMemo(() => findSegmentStart(exp.video_quote, segments), [exp.video_quote, segments])
-  const canJump = startMs != null
+  const idx = useMemo(() => findSegmentIndex(exp.video_quote, segments), [exp.video_quote, segments])
+  const canJump = idx != null
+  const quote = useMemo(() => extractQuoteSentence(exp.video_quote, exp.pattern), [exp.video_quote, exp.pattern])
 
   return (
     <div className="mx-3 mb-2 rounded-xl bg-stone-50 px-4 py-3">
@@ -754,7 +800,7 @@ function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
       <button
         type="button"
         disabled={!canJump}
-        onClick={() => canJump && onSeek(startMs!)}
+        onClick={() => canJump && onJump(idx!, segments[idx!].startMs)}
         title={canJump ? t.watch.jumpToVideo : undefined}
         className={cn(
           "mt-2 block text-left text-sm italic leading-snug underline decoration-2 underline-offset-2",
@@ -763,7 +809,7 @@ function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
             : "text-stone-500 decoration-stone-300 cursor-default"
         )}
       >
-        &ldquo;{exp.video_quote}&rdquo;
+        &ldquo;{quote}&rdquo;
       </button>
 
       {exp.transfers?.length > 0 && (
