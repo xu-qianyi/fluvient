@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react"
 import { withUserApiKey } from "@/lib/user-api-key"
+import { useLanguage } from "@/contexts/language-context"
 import { Send, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +27,7 @@ const DEFAULT_PROMPTS: { label: string; icon?: boolean }[] = [
 ]
 
 export const ChatPanel = forwardRef<ChatPanelHandle, Props>(({ transcript }, ref) => {
+  const { t } = useLanguage()
   const [messages, setMessagesState] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
@@ -54,14 +56,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, Props>(({ transcript }, ref
       const data = await r.json()
       setMessages([...next, {
         role: "assistant",
-        content: data.message ?? "出错了，请重试。",
+        content: data.message ?? t.chat.errorRetry,
       }])
     } catch {
-      setMessages([...next, { role: "assistant", content: "出错了，请重试。" }])
+      setMessages([...next, { role: "assistant", content: t.chat.errorRetry }])
     } finally {
       setLoading(false)
     }
-  }, [transcript, setMessages])
+  }, [transcript, setMessages, t])
 
   useImperativeHandle(ref, () => ({ sendMessage }), [sendMessage])
 
@@ -124,7 +126,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, Props>(({ transcript }, ref
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="问点什么…"
+            placeholder={t.chat.placeholder}
             disabled={loading}
             className="flex-1 text-sm bg-stone-100 rounded-full px-4 py-2 outline-none placeholder:text-stone-400 disabled:opacity-50"
           />

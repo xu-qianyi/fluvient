@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import type { WordDefinition } from "@/app/api/definition/[word]/route"
 import type { VocabTerm } from "@/app/api/vocab/[videoId]/route"
 import { withUserApiKey } from "@/lib/user-api-key"
+import { useLanguage } from "@/contexts/language-context"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -38,6 +39,7 @@ function lsSet(word: string, def: WordDefinition) {
 }
 
 export function WordPopup({ term, prefilled, anchorRect, onClose, youtubeId, onSaved, onExampleReady }: Props) {
+  const { t } = useLanguage()
   const ref = useRef<HTMLDivElement>(null)
   const [detail, setDetail] = useState<DetailState>({ status: "loading" })
   const [saveState, setSaveState] = useState<SaveState>("idle")
@@ -180,10 +182,10 @@ export function WordPopup({ term, prefilled, anchorRect, onClose, youtubeId, onS
         ) : detail.status === "loading" ? (
           <div className="flex items-center gap-2 text-stone-400 py-1">
             <Spinner />
-            <span>加载中…</span>
+            <span>{t.watch.loading}</span>
           </div>
         ) : (
-          <p className="text-stone-400 py-1">释义加载失败</p>
+          <p className="text-stone-400 py-1">{t.watch.defLoadFailed}</p>
         )}
 
         {example && (
@@ -196,7 +198,7 @@ export function WordPopup({ term, prefilled, anchorRect, onClose, youtubeId, onS
         {!example && detail.status === "loading" && definitionZh && (
           <div className="flex items-center gap-1.5 text-stone-300 text-xs">
             <Spinner size="sm" />
-            <span>加载例句…</span>
+            <span>{t.watch.loadingExample}</span>
           </div>
         )}
       </div>
@@ -215,7 +217,7 @@ export function WordPopup({ term, prefilled, anchorRect, onClose, youtubeId, onS
                 : "bg-stone-900 text-white hover:bg-stone-700 disabled:opacity-50"
             )}
           >
-            {saveState === "saved" ? "已加入生词本 ✓" : saveState === "saving" ? "保存中…" : saveState === "error" ? "保存失败，重试" : "加入生词本"}
+            {saveState === "saved" ? t.watch.saved : saveState === "saving" ? t.watch.saving : saveState === "error" ? t.watch.saveError : t.watch.saveToVocab}
           </button>
         </div>
       )}

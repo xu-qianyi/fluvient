@@ -29,7 +29,7 @@ function conicGradient(c: typeof OUTER) {
   return `conic-gradient(from 0deg at 50% 50%, ${c.tl} 0deg, ${c.tr} 90deg, ${c.br} 180deg, ${c.bl} 270deg, ${c.tl} 360deg)`
 }
 
-export function ChatInput({ placeholder = "输入消息…", onSend, disabled = false, className }: Props) {
+export function ChatInput({ placeholder = "Type a message…", onSend, disabled = false, className }: Props) {
   const [message, setMessage] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 

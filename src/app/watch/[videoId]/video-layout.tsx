@@ -305,7 +305,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
       {showLevelNotice && (
         <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs text-stone-600 shadow-lg">
           <span>
-            等级已切换为 <span className="font-semibold uppercase">{cefrLevel}</span>，将在下个视频生效
+            {t.watch.levelChangedPre}<span className="font-semibold uppercase">{cefrLevel}</span>{t.watch.levelChangedPost}
           </span>
           <button
             onClick={() => setDismissedForLevel(cefrLevel)}
@@ -321,8 +321,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white gap-5">
           <div className="w-10 h-10 rounded-full border-[3px] border-stone-200 border-t-stone-500 animate-spin" />
           <div className="flex flex-col items-center gap-1 text-center">
-            <p className="text-[15px] font-semibold text-stone-800">正在加载视频工作区</p>
-            <p className="text-sm text-stone-400">正在获取字幕...</p>
+            <p className="text-[15px] font-semibold text-stone-800">{t.watch.loadingWorkspace}</p>
+            <p className="text-sm text-stone-400">{t.watch.fetchingSubtitles}</p>
           </div>
         </div>
       )}
@@ -332,28 +332,28 @@ export function VideoLayout({ videoId }: { videoId: string }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-50">
           <div className="bg-white rounded-2xl shadow-sm ring-1 ring-stone-900/5 px-10 py-10 max-w-md w-full mx-4 text-center">
             <p className="text-lg font-bold text-stone-900 mb-3">
-              {transcriptError === "quota_exceeded" ? "今日额度已用完" : "无法分析该视频"}
+              {transcriptError === "quota_exceeded" ? t.watch.quotaExceededTitle : t.watch.cannotAnalyzeTitle}
             </p>
             <p className="text-sm text-stone-500 leading-relaxed mb-8">
               {transcriptError === "quota_exceeded"
-                ? "每天最多加载 3 个新视频。你仍可以在首页浏览已经加载好的视频，或明天再来。"
+                ? t.watch.quotaExceededBody
                 : transcriptError === "no_transcript"
-                ? "该视频没有可用的字幕，可能未开启字幕功能。请换一个有字幕的视频试试。"
-                : "字幕加载失败，请检查网络后重试。"}
+                ? t.watch.noTranscriptBody
+                : t.watch.loadFailedBody}
             </p>
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={() => router.push("/")}
                 className="px-5 py-2 rounded-full text-sm font-medium border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors"
               >
-                返回首页
+                {t.watch.backHome}
               </button>
               {transcriptError !== "quota_exceeded" && (
                 <button
                   onClick={fetchTranscript}
                   className="px-5 py-2 rounded-full text-sm font-medium bg-stone-900 text-white hover:bg-stone-700 transition-colors"
                 >
-                  重试
+                  {t.watch.retry}
                 </button>
               )}
             </div>
@@ -377,7 +377,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
               {!segments.length ? (
                 <p className="text-stone-300 text-xl">{t.watch.transcriptLoading}</p>
               ) : activeIdx < 0 ? (
-                <p className="text-stone-300 text-xl">播放视频开始学习</p>
+                <p className="text-stone-300 text-xl">{t.watch.playToStart}</p>
               ) : (
                 <>
                   <LearningText
@@ -401,15 +401,15 @@ export function VideoLayout({ videoId }: { videoId: string }) {
             <div className="flex items-center gap-1 flex-1 bg-stone-100 rounded-xl p-1">
               <TabBtn active={activeTab === "transcript"} onClick={() => setActiveTab("transcript")}>
                 <Languages className="w-3.5 h-3.5" />
-                字幕
+                {t.watch.tabTranscript}
               </TabBtn>
               <TabBtn active={activeTab === "notes"} onClick={() => setActiveTab("notes")}>
                 <PenLine className="w-3.5 h-3.5" />
-                随学卡
+                {t.watch.tabCards}
               </TabBtn>
               <TabBtn active={activeTab === "chat"} onClick={() => setActiveTab("chat")}>
                 <MessageSquare className="w-3.5 h-3.5" />
-                AI 聊天
+                {t.watch.tabChat}
               </TabBtn>
             </div>
           </div>
@@ -521,12 +521,12 @@ export function VideoLayout({ videoId }: { videoId: string }) {
           <div className={cn("flex-1 overflow-y-auto py-2", activeTab !== "notes" && "hidden")}>
             {vocabError ? (
               <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
-                <p className="text-sm text-stone-500">生词分析失败，可能是 API 配额已用完</p>
+                <p className="text-sm text-stone-500">{t.watch.vocabFailed}</p>
                 <button
                   onClick={fetchVocab}
                   className="px-4 py-1.5 rounded-full text-xs font-medium border border-stone-300 text-stone-600 hover:bg-stone-50 transition-colors"
                 >
-                  重新分析
+                  {t.watch.reanalyze}
                 </button>
 
                 <div className="w-full border-t border-stone-100 pt-4 mt-1">
@@ -535,11 +535,11 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       onClick={() => setShowKeyInput(true)}
                       className="text-xs text-stone-400 hover:text-stone-600 underline underline-offset-2 transition-colors"
                     >
-                      使用自己的 API Key
+                      {t.watch.useOwnKey}
                     </button>
                   ) : (
                     <div className="flex flex-col gap-2.5">
-                      <p className="text-xs text-stone-500 font-medium text-left">选择 AI 服务商</p>
+                      <p className="text-xs text-stone-500 font-medium text-left">{t.watch.selectProvider}</p>
                       <div className="grid grid-cols-3 gap-1.5">
                         {(["google", "openai", "anthropic"] as ApiProvider[]).map((p) => (
                           <button
@@ -577,14 +577,14 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                         disabled={!keyInputValue.trim()}
                         className="w-full py-2 rounded-lg bg-stone-900 text-white text-xs font-medium disabled:opacity-30 hover:bg-stone-700 transition-colors"
                       >
-                        保存并重试
+                        {t.watch.saveAndRetry}
                       </button>
                       <p className="text-[11px] text-stone-400">
-                        {selectedProvider === "google" && <>从{" "}<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Google AI Studio</a>{" "}免费获取</>}
-                        {selectedProvider === "openai" && <>从{" "}<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">OpenAI Platform</a>{" "}获取（按量付费）</>}
-                        {selectedProvider === "anthropic" && <>从{" "}<a href="https://console.anthropic.com/settings/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Anthropic Console</a>{" "}获取（按量付费）</>}
+                        {selectedProvider === "google" && <>{t.watch.keyHintGooglePre}<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Google AI Studio</a>{t.watch.keyHintGooglePost}</>}
+                        {selectedProvider === "openai" && <>{t.watch.keyHintOpenaiPre}<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">OpenAI Platform</a>{t.watch.keyHintOpenaiPost}</>}
+                        {selectedProvider === "anthropic" && <>{t.watch.keyHintAnthropicPre}<a href="https://console.anthropic.com/settings/api-keys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-600">Anthropic Console</a>{t.watch.keyHintAnthropicPost}</>}
                       </p>
-                      <p className="text-[11px] text-stone-400">Key 仅存在你的本地浏览器，仅用于转发 AI 请求，不会被存储或记录。</p>
+                      <p className="text-[11px] text-stone-400">{t.watch.keyPrivacy}</p>
                     </div>
                   )}
                 </div>
@@ -595,7 +595,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
-                正在分析生词…
+                {t.watch.analyzingVocab}
               </div>
             ) : (
               <>
@@ -611,12 +611,12 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       )}
                     >
                       {hideTranslation ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      隐藏翻译
+                      {t.watch.hideTranslation}
                     </button>
                   </div>
                 )}
-                <VocabSection title="Vocabulary" items={filteredVocab.filter((i) => !i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
-                <VocabSection title="Short Phrases" items={filteredVocab.filter((i) => i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
+                <VocabSection title={t.watch.vocabularyHeading} items={filteredVocab.filter((i) => !i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
+                <VocabSection title={t.watch.shortPhrasesHeading} items={filteredVocab.filter((i) => i.isPhrase)} onDelete={handleDeleteVocab} hideTranslation={hideTranslation} />
                 <ExpressionSection expressions={expressions} segments={segments} onSeek={handleSeek} hideTranslation={hideTranslation} />
               </>
             )}
@@ -723,10 +723,11 @@ function ExpressionSection({ expressions, segments, onSeek, hideTranslation }: {
   onSeek: (ms: number) => void
   hideTranslation: boolean
 }) {
+  const { t } = useLanguage()
   if (!expressions.length) return null
   return (
     <div className="mt-2 border-t border-stone-100 pt-1">
-      <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 text-center">表达锦囊</p>
+      <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 text-center">{t.watch.expressionTips}</p>
       {expressions.map((exp, i) => (
         <ExpressionCardItem key={i} exp={exp} segments={segments} onSeek={onSeek} hideTranslation={hideTranslation} />
       ))}
@@ -740,6 +741,7 @@ function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
   onSeek: (ms: number) => void
   hideTranslation: boolean
 }) {
+  const { t } = useLanguage()
   const startMs = useMemo(() => findSegmentStart(exp.video_quote, segments), [exp.video_quote, segments])
   const canJump = startMs != null
 
@@ -753,7 +755,7 @@ function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
         type="button"
         disabled={!canJump}
         onClick={() => canJump && onSeek(startMs!)}
-        title={canJump ? "跳转到视频此处" : undefined}
+        title={canJump ? t.watch.jumpToVideo : undefined}
         className={cn(
           "mt-2 block text-left text-sm italic leading-snug underline decoration-2 underline-offset-2",
           canJump
@@ -766,7 +768,7 @@ function ExpressionCardItem({ exp, segments, onSeek, hideTranslation }: {
 
       {exp.transfers?.length > 0 && (
         <div className="mt-3 space-y-1.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">换个场景也能用</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">{t.watch.worksElsewhere}</p>
           {exp.transfers.map((tr, i) => (
             <div key={i} className="leading-snug">
               <p className="text-xs text-stone-600">{tr.en}</p>
@@ -817,6 +819,7 @@ function VocabItem({ item, openKey, setOpenKey, onDelete, hideTranslation }: {
   onDelete: (key: string) => void
   hideTranslation: boolean
 }) {
+  const { t } = useLanguage()
   const isOpen = openKey === item.key
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -848,7 +851,7 @@ function VocabItem({ item, openKey, setOpenKey, onDelete, hideTranslation }: {
               onClick={() => setOpenKey(null)}
             >
               <ExternalLink className="w-3.5 h-3.5 text-stone-400" />
-              Look up on Wiktionary
+              {t.watch.lookUpOnWiktionary}
             </a>
             <a
               href={`https://dictionary.cambridge.org/dictionary/english/${encodeURIComponent(item.content)}`}
@@ -858,7 +861,7 @@ function VocabItem({ item, openKey, setOpenKey, onDelete, hideTranslation }: {
               onClick={() => setOpenKey(null)}
             >
               <ExternalLink className="w-3.5 h-3.5 text-stone-400" />
-              Look up on Cambridge
+              {t.watch.lookUpOnCambridge}
             </a>
             <a
               href={`https://www.ldoceonline.com/dictionary/${encodeURIComponent(item.content)}`}
@@ -868,14 +871,14 @@ function VocabItem({ item, openKey, setOpenKey, onDelete, hideTranslation }: {
               onClick={() => setOpenKey(null)}
             >
               <ExternalLink className="w-3.5 h-3.5 text-stone-400" />
-              Look up on Longman
+              {t.watch.lookUpOnLongman}
             </a>
             <button
               onClick={() => { onDelete(item.key); setOpenKey(null) }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-stone-50"
             >
               <Trash2 className="w-3.5 h-3.5 text-red-400" />
-              移除
+              {t.watch.remove}
             </button>
           </div>
         )}
@@ -906,7 +909,7 @@ function VocabItem({ item, openKey, setOpenKey, onDelete, hideTranslation }: {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
-          <span className="text-xs text-stone-300">加载例句…</span>
+          <span className="text-xs text-stone-300">{t.watch.loadingExample}</span>
         </div>
       ) : null}
     </div>
