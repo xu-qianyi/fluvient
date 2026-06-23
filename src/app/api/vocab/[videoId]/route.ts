@@ -1,7 +1,7 @@
 import { YoutubeTranscript } from "youtube-transcript"
 import { NextResponse } from "next/server"
 import { generateObject } from "ai"
-import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
+import { runWithModelFallback, getProviderFromHeader } from "@/lib/ai-provider"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -133,8 +133,9 @@ export async function GET(req: Request, { params }: Params) {
       .filter(Boolean)
       .join(" ")
 
-    const { object } = await generateObject({
-      model: createModel(apiKey, getProviderFromHeader(req)),
+    const { object } = await runWithModelFallback(apiKey, getProviderFromHeader(req), (model) =>
+      generateObject({
+      model,
       maxRetries: 0,
       schema,
       prompt: `You are an English teacher for Chinese learners at ${level.toUpperCase()} level.
@@ -162,7 +163,8 @@ Pick expressions that are genuinely transferable and high-value — quality over
 
 Transcript:
 ${fullText.slice(0, 8000)}`,
-    })
+      }),
+    )
 
     const phonetics = await Promise.all(object.terms.map((t) => fetchPhonetic(t.term)))
     const terms: VocabTerm[] = object.terms.map((t, i) => ({

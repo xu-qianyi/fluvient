@@ -13,7 +13,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "EchoLingo",
+  title: "Fluvient",
   description: "通过 YouTube 视频学英语，实时字幕同步，AI 生成学习笔记",
 }
 

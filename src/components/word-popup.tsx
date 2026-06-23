@@ -5,6 +5,7 @@ import type { WordDefinition } from "@/app/api/definition/[word]/route"
 import type { VocabTerm } from "@/app/api/vocab/[videoId]/route"
 import { withUserApiKey } from "@/lib/user-api-key"
 import { useLanguage } from "@/contexts/language-context"
+import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 interface Props {
@@ -26,7 +27,7 @@ type SaveState = "idle" | "saving" | "saved" | "error"
 
 const clientCache = new Map<string, WordDefinition>()
 
-const LS_PREFIX = "echolingo:def:"
+const LS_PREFIX = "fluvient:def:"
 
 function lsGet(word: string): WordDefinition | null {
   try { const raw = localStorage.getItem(LS_PREFIX + word); return raw ? JSON.parse(raw) : null }
@@ -40,6 +41,7 @@ function lsSet(word: string, def: WordDefinition) {
 
 export function WordPopup({ term, prefilled, anchorRect, onClose, youtubeId, onSaved, onExampleReady }: Props) {
   const { t } = useLanguage()
+  const { requireAuth } = useAuth()
   const ref = useRef<HTMLDivElement>(null)
   const [detail, setDetail] = useState<DetailState>({ status: "loading" })
   const [saveState, setSaveState] = useState<SaveState>("idle")
@@ -117,8 +119,16 @@ export function WordPopup({ term, prefilled, anchorRect, onClose, youtubeId, onS
     setPendingExample(false)
   }, [detail, pendingExample, onExampleReady, term, prefilled])
 
-  const handleSave = async () => {
+  // Saving a word belongs to the user's personal vocabulary — it requires login.
+  // requireAuth runs doSave immediately when authed, otherwise opens the login
+  // modal and replays doSave once the user signs in. The word goes only to the
+  // user's own saved_items; it never touches this video's central AI cache.
+  const handleSave = () => {
     if (!youtubeId || saveState === "saving" || saveState === "saved") return
+    requireAuth(doSave)
+  }
+
+  const doSave = async () => {
     const hasExample = detail.status === "ok"
     setSaveState("saving")
     try {

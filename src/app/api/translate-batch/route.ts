@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateObject } from "ai"
-import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
+import { runWithModelFallback, getProviderFromHeader } from "@/lib/ai-provider"
 import { createClient } from "@/lib/supabase/server"
 import { createHash } from "crypto"
 import { z } from "zod"
@@ -42,8 +42,9 @@ export async function POST(req: Request) {
     if (!apiKey) return NextResponse.json({ error: "no_api_key" }, { status: 503 })
 
     try {
-      const { object } = await generateObject({
-        model: createModel(apiKey, getProviderFromHeader(req)),
+      const { object } = await runWithModelFallback(apiKey, getProviderFromHeader(req), (model) =>
+        generateObject({
+        model,
         maxRetries: 0,
         schema: z.object({
           translations: z
@@ -51,7 +52,8 @@ export async function POST(req: Request) {
             .describe("Chinese translations in the exact same order as the input sentences"),
         }),
         prompt: `Translate each numbered English sentence into natural, fluent Chinese. Return exactly ${missing.length} translations in the same order. Keep each translation concise.\n\n${missing.map((t, i) => `${i + 1}. "${t}"`).join("\n")}`,
-      })
+        }),
+      )
       missing.forEach((t, i) => {
         const zh = object.translations[i]
         if (zh) result[t] = zh

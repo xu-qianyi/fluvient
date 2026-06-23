@@ -1,7 +1,7 @@
 export type ApiProvider = "google" | "openai" | "anthropic"
 
-const KEY_STORAGE = "echolingo_user_api_key"
-const PROVIDER_STORAGE = "echolingo_user_api_provider"
+const KEY_STORAGE = "fluvient_user_api_key"
+const PROVIDER_STORAGE = "fluvient_user_api_provider"
 
 export function getUserApiKey(): string | null {
   if (typeof window === "undefined") return null

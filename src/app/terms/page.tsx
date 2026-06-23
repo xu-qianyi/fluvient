@@ -2,15 +2,15 @@ import type { Metadata } from "next"
 import { LegalPage, LegalSection } from "@/components/legal-page"
 
 export const metadata: Metadata = {
-  title: "Terms of Service · EchoLingo",
-  description: "EchoLingo Terms of Service",
+  title: "Terms of Service · Fluvient",
+  description: "Fluvient Terms of Service",
 }
 
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service" updated="June 16, 2026">
       <p>
-        Welcome to EchoLingo (the &quot;Service&quot;). The Service is a tool for learning English with
+        Welcome to Fluvient (the &quot;Service&quot;). The Service is a tool for learning English with
         the help of YouTube videos, providing synchronized subtitles, AI-assisted translations and
         word definitions, and the ability to save vocabulary and notes. Please read these terms
         carefully before using the Service. By accessing or using the Service, you acknowledge that

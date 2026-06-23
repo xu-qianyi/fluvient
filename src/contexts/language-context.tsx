@@ -23,10 +23,10 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
-const LOCALE_KEY = "echolingo-locale"
-const CEFR_KEY = "echolingo-cefr"
-const NATIVE_KEY = "echolingo-native"
-const ONBOARDED_KEY = "echolingo-onboarded"
+const LOCALE_KEY = "fluvient-locale"
+const CEFR_KEY = "fluvient-cefr"
+const NATIVE_KEY = "fluvient-native"
+const ONBOARDED_KEY = "fluvient-onboarded"
 const VALID_CEFR: CefrLevel[] = ["a1", "a2", "b1", "b2", "c1"]
 const VALID_NATIVE: NativeLanguage[] = ["zh", "ko", "es", "fr"]
 

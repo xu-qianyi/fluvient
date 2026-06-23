@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronDown, ChevronUp, Eye, EyeOff, ExternalLink, Languages, MessageSquare, MoreVertical, PenLine, Search, Trash2, X } from "lucide-react"
 import { useLanguage } from "@/contexts/language-context"
+import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useYouTubePlayer } from "@/hooks/use-youtube-player"
 import { TranscriptSegment } from "@/components/transcript-segment"
@@ -13,6 +14,7 @@ import { Footer } from "@/components/footer"
 import { tokenizeWithVocab } from "@/lib/vocab-highlight"
 import { getUserApiKey, getUserApiProvider, setUserApi, withUserApiKey, type ApiProvider } from "@/lib/user-api-key"
 import type { VocabTerm, ExpressionCard } from "@/app/api/vocab/[videoId]/route"
+import type { SavedItem } from "@/app/api/saved-items/route"
 import type { TranscriptSegment as Segment } from "@/app/api/transcript/[videoId]/route"
 import type { CefrLevel } from "@/data/cefr-words"
 import { cn } from "@/lib/utils"
@@ -36,6 +38,19 @@ function tokenizeToChips(text: string, vocabTerms: VocabTerm[], cefrLevel: CefrL
   return chips
 }
 
+// A user's saved_items row carries the same teaching fields as an AI VocabTerm
+// (minus phonetic, which isn't stored), so we present it in the same list shape.
+function savedItemToVocab(item: SavedItem): VocabTerm {
+  return {
+    term: item.content,
+    definition_zh: item.zh_definition ?? "",
+    level: "",
+    pos: item.type === "phrase" ? "phr." : "",
+    example: item.example ?? "",
+    zh_example: item.zh_example ?? "",
+  }
+}
+
 type Tab = "transcript" | "notes" | "chat"
 
 const PLAYER_ID = "yt-player"
@@ -43,6 +58,7 @@ const POLL_MS = 250
 
 export function VideoLayout({ videoId }: { videoId: string }) {
   const { t, cefrLevel, hydrated } = useLanguage()
+  const { user } = useAuth()
   const router = useRouter()
   // Token guardrail: AI vocab/transcript are generated per (video × level), so
   // we pin the level at load time and DON'T react to live level changes. Editing
@@ -57,7 +73,12 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   const [transcriptError, setTranscriptError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [translations, setTranslations] = useState<Record<string, string>>({})
+  // AI-selected vocab from the central per-video cache (study_notes). Never holds
+  // user-added words — those live in savedTerms and the per-user saved_items table.
   const [vocabTerms, setVocabTerms] = useState<VocabTerm[]>([])
+  // The logged-in user's own saved words for this video. Persisted in saved_items,
+  // shown merged into the same list, but kept out of the central AI cache.
+  const [savedTerms, setSavedTerms] = useState<VocabTerm[]>([])
   const [expressions, setExpressions] = useState<ExpressionCard[]>([])
   const [vocabError, setVocabError] = useState(false)
   const [vocabLoading, setVocabLoading] = useState(false)
@@ -143,6 +164,21 @@ export function VideoLayout({ videoId }: { videoId: string }) {
     if (!hydrated) return
     fetchTranscript()
   }, [hydrated, fetchTranscript])
+
+  // Load the user's own saved words for this video so a logged-in learner keeps
+  // seeing their additions across reloads. Anonymous viewers have none (saving
+  // requires login), so we just clear. Re-runs on login so words appear at once.
+  useEffect(() => {
+    if (!user) { setSavedTerms([]); return }
+    let cancelled = false
+    fetch(`/api/saved-items?youtubeId=${videoId}`)
+      .then((r) => r.json())
+      .then((data: { items?: SavedItem[] }) => {
+        if (!cancelled && data.items) setSavedTerms(data.items.map(savedItemToVocab))
+      })
+      .catch(() => { /* non-critical — they'll reappear on next load */ })
+    return () => { cancelled = true }
+  }, [user, videoId])
 
   // On-demand translation: only translate the segment being played, plus a small
   // lookahead. The center "learning display" is the sole consumer, and it shows
@@ -267,8 +303,16 @@ export function VideoLayout({ videoId }: { videoId: string }) {
 
   const currentSeg = activeIdx >= 0 ? segments[activeIdx] : null
 
-  // Sort AI vocab: words before phrases
-  const mergedVocab = useMemo(() => vocabTerms
+  // AI vocab plus the user's own saved words (deduped, AI entry wins) — this is
+  // what we display and highlight. The two states stay separate so the central
+  // cache is never touched; they're only merged for the view.
+  const allTerms = useMemo(() => {
+    const aiKeys = new Set(vocabTerms.map((t) => t.term.toLowerCase()))
+    return [...vocabTerms, ...savedTerms.filter((t) => !aiKeys.has(t.term.toLowerCase()))]
+  }, [vocabTerms, savedTerms])
+
+  // Sort vocab: words before phrases
+  const mergedVocab = useMemo(() => allTerms
     .map((t) => ({
       key: t.term.toLowerCase(),
       content: t.term,
@@ -281,7 +325,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
       loadingExample: loadingExampleKeys.has(t.term.toLowerCase()),
     }))
     .sort((a, b) => Number(a.isPhrase) - Number(b.isPhrase))
-  , [vocabTerms, loadingExampleKeys])
+  , [allTerms, loadingExampleKeys])
 
   const filteredVocab = useMemo(
     () => mergedVocab.filter((i) => !deletedVocabKeys.has(i.key)),
@@ -293,7 +337,8 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   }, [])
 
   const handleVocabSaved = useCallback((newTerm: VocabTerm) => {
-    setVocabTerms((prev) => {
+    // User-added word → personal list only, never the AI/central cache.
+    setSavedTerms((prev) => {
       if (prev.some((t) => t.term.toLowerCase() === newTerm.term.toLowerCase())) return prev
       return [...prev, newTerm]
     })
@@ -303,7 +348,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
   }, [])
 
   const handleExampleReady = useCallback((updatedTerm: VocabTerm) => {
-    setVocabTerms((prev) =>
+    setSavedTerms((prev) =>
       prev.map((t) => t.term.toLowerCase() === updatedTerm.term.toLowerCase() ? updatedTerm : t)
     )
     setLoadingExampleKeys((prev) => {
@@ -402,7 +447,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                 <>
                   <LearningText
                     text={currentSeg?.text ?? ""}
-                    vocabTerms={vocabTerms}
+                    vocabTerms={allTerms}
                     cefrLevel={appliedLevel}
                     onWordClick={handleWordClick}
                     translation={translations[currentSeg?.text ?? ""] ?? null}
@@ -524,7 +569,7 @@ export function VideoLayout({ videoId }: { videoId: string }) {
                       text={seg.text}
                       startMs={seg.startMs}
                       isActive={activeIdx === i}
-                      vocabTerms={vocabTerms}
+                      vocabTerms={allTerms}
                       cefrLevel={cefrLevel}
                       onSeek={handleSeek}
                       onWordClick={handleWordClick}

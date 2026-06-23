@@ -9,6 +9,7 @@ import { type CefrLevel } from "@/data/cefr-words"
 import { CEFR_LEVELS, CEFR_TEST_URL } from "@/lib/learner-options"
 import { locales } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { Modal } from "@/components/ui/modal"
 
 // Per-level badge colors: a cool→warm difficulty gradient (entry-level green →
 // advanced rose) so the badges read as level cues, not as the black CTA button.
@@ -59,10 +60,13 @@ export function Onboarding() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" />
-
-      <div className="relative w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+    <Modal
+      onClose={finish}
+      size="md"
+      closeOnBackdrop={false}
+      closeOnEsc={false}
+      showClose={false}
+    >
         {/* Skip — respects "don't force new users"; keeps current defaults. */}
         <button
           onClick={finish}
@@ -212,7 +216,6 @@ export function Onboarding() {
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }

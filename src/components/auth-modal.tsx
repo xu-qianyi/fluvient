@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useLanguage } from "@/contexts/language-context"
 import { cn } from "@/lib/utils"
+import { Modal } from "@/components/ui/modal"
 
 export function AuthModal() {
   const { authModalOpen, hideAuthModal, signInWithGoogle, signInWithEmail } = useAuth()
@@ -13,6 +14,8 @@ export function AuthModal() {
   const [linkSent, setLinkSent] = useState(false)
   const [emailError, setEmailError] = useState("")
   const [emailLoading, setEmailLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -20,17 +23,10 @@ export function AuthModal() {
       setEmail("")
       setLinkSent(false)
       setEmailError("")
+      setResent(false)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [authModalOpen])
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") hideAuthModal()
-    }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
-  }, [hideAuthModal])
 
   if (!authModalOpen) return null
 
@@ -45,54 +41,52 @@ export function AuthModal() {
     else setLinkSent(true)
   }
 
+  async function handleResend() {
+    if (resending) return
+    setResending(true)
+    setResent(false)
+    const { error } = await signInWithEmail(email.trim(), window.location.pathname)
+    setResending(false)
+    if (!error) setResent(true)
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-stone-900/30 backdrop-blur-sm"
-        onClick={hideAuthModal}
-      />
-
-      {/* Card */}
-      <div className="relative w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-        {/* Close */}
-        <button
-          onClick={hideAuthModal}
-          className="absolute right-4 top-4 text-stone-400 hover:text-stone-600 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-stone-900">{t.auth.title}</h2>
-          <p className="mt-1 text-sm text-stone-500">{t.auth.subtitle}</p>
-        </div>
-
+    <Modal onClose={hideAuthModal} size="sm" className="p-8">
         {linkSent ? (
-          <div>
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-stone-100">
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100">
               <svg className="h-5 w-5 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <p className="text-sm text-stone-700 font-medium">{t.auth.linkSentTitle}</p>
-            <p className="mt-1 text-sm text-stone-500">
-              {t.auth.linkSentPre}<span className="text-stone-700 font-medium">{email}</span>{t.auth.linkSentPost}
-            </p>
-            <p className="mt-3 text-xs text-stone-400">
+            <h2 className="text-lg font-semibold text-stone-900">{t.auth.linkSentTitle}</h2>
+            <p className="mt-1.5 text-sm text-stone-500">
+              {t.auth.linkSentPre}<span className="text-stone-700 font-medium">{email}</span>{t.auth.linkSentPost}{" "}
               {t.auth.checkSpam}
             </p>
-            <button
-              onClick={() => { setLinkSent(false); setEmailError("") }}
-              className="mt-4 w-full text-xs text-stone-400 hover:text-stone-600 transition-colors"
-            >
-              {t.auth.changeEmail}
-            </button>
+            <div className="mt-5 flex w-full flex-col items-center gap-2">
+              <button
+                onClick={handleResend}
+                disabled={resending || resent}
+                className="h-9 w-full rounded-lg border border-stone-200 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-60 disabled:hover:bg-white transition-colors"
+              >
+                {resending ? t.auth.resending : resent ? t.auth.resent : t.auth.resend}
+              </button>
+              <button
+                onClick={() => { setLinkSent(false); setEmailError(""); setResent(false) }}
+                className="text-xs font-medium text-stone-400 hover:text-stone-600 transition-colors"
+              >
+                {t.auth.changeEmail}
+              </button>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div>
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-stone-900">{t.auth.title}</h2>
+              <p className="mt-1.5 text-sm text-stone-500">{t.auth.subtitle}</p>
+            </div>
+
             {/* Google OAuth */}
             <button
               onClick={() => signInWithGoogle(window.location.pathname)}
@@ -103,14 +97,14 @@ export function AuthModal() {
             </button>
 
             {/* Divider */}
-            <div className="flex items-center gap-3">
+            <div className="my-5 flex items-center gap-3">
               <div className="flex-1 h-px bg-stone-200" />
               <span className="text-xs text-stone-400">{t.auth.orEmail}</span>
               <div className="flex-1 h-px bg-stone-200" />
             </div>
 
             {/* Email magic link */}
-            <form onSubmit={handleEmailSubmit} className="space-y-2">
+            <form onSubmit={handleEmailSubmit} className="space-y-2.5">
               <input
                 ref={inputRef}
                 type="email"
@@ -137,7 +131,7 @@ export function AuthModal() {
             </form>
 
             {/* Consent */}
-            <p className="pt-1 text-center text-xs leading-relaxed text-stone-400">
+            <p className="mt-6 text-center text-xs leading-relaxed text-stone-400">
               {t.auth.consentPre}{" "}
               <Link
                 href="/terms"
@@ -157,8 +151,7 @@ export function AuthModal() {
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateObject } from "ai"
-import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
+import { runWithModelFallback, getProviderFromHeader } from "@/lib/ai-provider"
 import { extractPhonetic } from "@/lib/dictionary"
 import { createClient } from "@/lib/supabase/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -123,15 +123,17 @@ export async function GET(req: Request, { params }: Params) {
       if (parsed) {
         const phonetic = extractPhonetic(dictData)
         const exampleText = parsed.example || `Use "${lower}" in a sentence.`
-        const { object } = await generateObject({
-          model: createModel(apiKey, getProviderFromHeader(req)),
+        const { object } = await runWithModelFallback(apiKey, getProviderFromHeader(req), (model) =>
+          generateObject({
+          model,
           maxRetries: 0,
           schema: zhSchema,
           prompt: `Translate to Chinese for an English learner.
 Definition: "${parsed.definition}"
 Example: "${exampleText}"
 zh_definition: 2–8 chars, natural Chinese. zh_example: accurate translation.`,
-        })
+          }),
+        )
         const result: WordDefinition = {
           word: lower, pos: parsed.pos, example: parsed.example, ...(phonetic ? { phonetic } : {}), ...object,
         }
@@ -144,8 +146,9 @@ zh_definition: 2–8 chars, natural Chinese. zh_example: accurate translation.`,
 
   // ── Path B: Full AI generation (phrases, rare words, API failures) ────────
   try {
-    const { object } = await generateObject({
-      model: createModel(apiKey, getProviderFromHeader(req)),
+    const { object } = await runWithModelFallback(apiKey, getProviderFromHeader(req), (model) =>
+      generateObject({
+      model,
       maxRetries: 0,
       schema: fullSchema,
       prompt: `You are a concise English-Chinese dictionary for Chinese learners.
@@ -154,7 +157,8 @@ Define "${lower}":
 - zh_definition: 2–8 characters, natural Chinese, no brackets
 - example: one natural example sentence
 - zh_example: accurate Chinese translation`,
-    })
+      }),
+    )
     const result: WordDefinition = { word: lower, ...object }
     cache.set(lower, result)
     persist(supabase, result)

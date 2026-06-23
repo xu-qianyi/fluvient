@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs"
 import { YoutubeTranscript } from "youtube-transcript"
 import { generateObject } from "ai"
 import { z } from "zod"
-import { createModel } from "@/lib/ai-provider"
+import { runWithModelFallback } from "@/lib/ai-provider"
 import { createClient } from "@supabase/supabase-js"
 
 // Load .env.local (tsx doesn't do this automatically).
@@ -33,11 +33,13 @@ async function main() {
         .filter(Boolean)
         .join(" ")
         .slice(0, 8000)
-      const { object } = await generateObject({
-        model: createModel(process.env.GOOGLE_GENERATIVE_AI_API_KEY!, "google"),
-        schema: z.object({ video_level: z.enum(["a1", "a2", "b1", "b2", "c1"]) }),
-        prompt: `Judge the OVERALL CEFR difficulty of this video for a listener, based on vocabulary, sentence complexity and speaking pace.\n\nTranscript:\n${text}`,
-      })
+      const { object } = await runWithModelFallback(process.env.GOOGLE_GENERATIVE_AI_API_KEY!, "google", (model) =>
+        generateObject({
+          model,
+          schema: z.object({ video_level: z.enum(["a1", "a2", "b1", "b2", "c1"]) }),
+          prompt: `Judge the OVERALL CEFR difficulty of this video for a listener, based on vocabulary, sentence complexity and speaking pace.\n\nTranscript:\n${text}`,
+        }),
+      )
       await sb.from("videos").update({ cefr_level: object.video_level }).eq("id", v.id)
       console.log(`${v.youtube_id}  => ${object.video_level}`)
     } catch (e) {

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Trash2, RefreshCw } from "lucide-react"
-import type { AdminCacheData } from "@/app/api/admin/cache/route"
+import { Trash2, RefreshCw, ChevronRight } from "lucide-react"
+import type { AdminCacheData, CachedVideo } from "@/app/api/admin/cache/route"
+import type { VideoCacheDetail } from "@/app/api/admin/cache/video/[id]/route"
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -112,61 +113,9 @@ export function AdminDashboard({ email }: { email: string }) {
             {data.videos.length === 0 ? (
               <p className="text-sm text-stone-400">暂无</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                 {data.videos.map((v) => (
-                  <div key={v.id} className="flex gap-3 rounded-lg border border-stone-200 bg-white p-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={v.thumbnail_url || `https://i.ytimg.com/vi/${v.youtube_id}/hqdefault.jpg`}
-                      alt=""
-                      className="w-28 h-16 object-cover rounded bg-stone-100 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/watch/${v.youtube_id}`}
-                        className="flex items-center gap-1.5 text-sm font-medium text-stone-900 hover:underline"
-                      >
-                        {v.cefr_level && (
-                          <span className="shrink-0 rounded bg-stone-200 px-1 text-[10px] font-semibold uppercase text-stone-600">
-                            {v.cefr_level}
-                          </span>
-                        )}
-                        <span className="truncate">{v.title || v.youtube_id}</span>
-                      </Link>
-                      <p className="text-xs text-stone-400 truncate">
-                        {v.author_name ? `${v.author_name} · ` : ""}<span className="font-mono">{v.youtube_id}</span>
-                      </p>
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {v.notes.length === 0 ? (
-                          <span className="text-xs text-amber-600">无词汇笔记</span>
-                        ) : (
-                          v.notes.map((n) => (
-                            <span
-                              key={n.cefr_level}
-                              className="inline-flex items-center gap-1 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600"
-                            >
-                              {n.cefr_level.toUpperCase()} · {n.term_count}词
-                              <button
-                                onClick={() => del("note", v.id, `${v.title || v.youtube_id} ${n.cefr_level}`, n.cefr_level)}
-                                className="text-stone-400 hover:text-red-500"
-                                title="删除该等级笔记"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => del("video", v.id, v.title || v.youtube_id)}
-                      disabled={busy === `video:${v.id}:`}
-                      className="shrink-0 self-start text-stone-300 hover:text-red-500 transition-colors"
-                      title="删除视频及其缓存"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <VideoCard key={v.id} v={v} del={del} busy={busy} />
                 ))}
               </div>
             )}
@@ -220,6 +169,160 @@ export function AdminDashboard({ email }: { email: string }) {
         </div>
       )}
     </main>
+  )
+}
+
+function VideoCard({
+  v,
+  del,
+  busy,
+}: {
+  v: CachedVideo
+  del: (type: string, id: string, label: string, level?: string) => void
+  busy: string | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [detail, setDetail] = useState<VideoCacheDetail | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+
+  const hasNotes = v.notes.length > 0
+
+  const toggle = useCallback(() => {
+    const next = !expanded
+    setExpanded(next)
+    if (next && !detail && !loading && hasNotes) {
+      setLoading(true)
+      setError(false)
+      fetch(`/api/admin/cache/video/${v.id}`)
+        .then(async (r) => {
+          if (!r.ok) throw new Error("load_failed")
+          return r.json()
+        })
+        .then((d: VideoCacheDetail) => setDetail(d))
+        .catch(() => setError(true))
+        .finally(() => setLoading(false))
+    }
+  }, [expanded, detail, loading, hasNotes, v.id])
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white">
+      <div className="flex gap-3 p-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={v.thumbnail_url || `https://i.ytimg.com/vi/${v.youtube_id}/hqdefault.jpg`}
+          alt=""
+          className="w-28 h-16 object-cover rounded bg-stone-100 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/watch/${v.youtube_id}`}
+            className="flex items-center gap-1.5 text-sm font-medium text-stone-900 hover:underline"
+          >
+            {v.cefr_level && (
+              <span className="shrink-0 rounded bg-stone-200 px-1 text-[10px] font-semibold uppercase text-stone-600">
+                {v.cefr_level}
+              </span>
+            )}
+            <span className="truncate">{v.title || v.youtube_id}</span>
+          </Link>
+          <p className="text-xs text-stone-400 truncate">
+            {v.author_name ? `${v.author_name} · ` : ""}<span className="font-mono">{v.youtube_id}</span>
+          </p>
+          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+            {!hasNotes ? (
+              <span className="text-xs text-amber-600">无词汇笔记</span>
+            ) : (
+              <>
+                {v.notes.map((n) => (
+                  <span
+                    key={n.cefr_level}
+                    className="inline-flex items-center gap-1 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600"
+                  >
+                    {n.cefr_level.toUpperCase()} · {n.term_count}词
+                    <button
+                      onClick={() => del("note", v.id, `${v.title || v.youtube_id} ${n.cefr_level}`, n.cefr_level)}
+                      className="text-stone-400 hover:text-red-500"
+                      title="删除该等级笔记"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <button
+                  onClick={toggle}
+                  className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs text-stone-500 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                >
+                  <ChevronRight className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
+                  {expanded ? "收起" : "详情"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={() => del("video", v.id, v.title || v.youtube_id)}
+          disabled={busy === `video:${v.id}:`}
+          className="shrink-0 self-start text-stone-300 hover:text-red-500 transition-colors"
+          title="删除视频及其缓存"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {expanded && hasNotes && (
+        <div className="border-t border-stone-100 px-3 py-3 space-y-4">
+          {loading && <p className="text-xs text-stone-400">加载中…</p>}
+          {error && <p className="text-xs text-red-500">加载失败</p>}
+          {detail?.notes.map((note) => (
+            <div key={note.cefr_level}>
+              <p className="text-xs font-semibold uppercase text-stone-500 mb-1.5">
+                {note.cefr_level} · {note.terms.length}词
+              </p>
+              {note.terms.length > 0 && (
+                <div className="rounded-md border border-stone-100 divide-y divide-stone-100 mb-2">
+                  {note.terms.map((term, i) => (
+                    <div key={`${term.term}-${i}`} className="px-2.5 py-1.5">
+                      <div className="flex items-baseline gap-1.5 text-sm">
+                        <span className="font-medium text-stone-900">{term.term}</span>
+                        {term.pos && <span className="text-stone-400 text-xs">{term.pos}</span>}
+                        {term.phonetic && <span className="text-stone-400 font-mono text-xs">{term.phonetic}</span>}
+                        <span className="shrink-0 rounded bg-stone-100 px-1 text-[10px] uppercase text-stone-500">
+                          {term.level}
+                        </span>
+                        <span className="text-stone-600 ml-auto truncate">{term.definition_zh}</span>
+                      </div>
+                      {term.example && (
+                        <p className="text-xs text-stone-400 mt-0.5 truncate">
+                          {term.example}
+                          {term.zh_example && <span className="text-stone-300"> · {term.zh_example}</span>}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {note.expressions.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-medium text-stone-400">表达锦囊 · {note.expressions.length}</p>
+                  {note.expressions.map((exp, i) => (
+                    <div key={i} className="rounded-md bg-stone-50 px-2.5 py-1.5 text-xs">
+                      <p className="text-stone-700">
+                        <span className="text-stone-500">{exp.scenario_zh}：</span>
+                        {exp.pattern}
+                      </p>
+                      {exp.video_quote && (
+                        <p className="text-stone-400 italic mt-0.5 truncate">“{exp.video_quote}”</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

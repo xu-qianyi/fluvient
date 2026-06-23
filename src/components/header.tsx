@@ -32,7 +32,7 @@ export function Header() {
   return (
     <header className="flex items-center justify-between h-12 px-4 shrink-0 bg-transparent">
       <Link href="/" className="text-sm font-semibold text-stone-900 tracking-tight">
-        EchoLingo
+        Fluvient
       </Link>
 
       <div className="flex items-center gap-2">

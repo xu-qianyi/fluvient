@@ -2,15 +2,15 @@ import type { Metadata } from "next"
 import { LegalPage, LegalSection } from "@/components/legal-page"
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · EchoLingo",
-  description: "EchoLingo Privacy Policy",
+  title: "Privacy Policy · Fluvient",
+  description: "Fluvient Privacy Policy",
 }
 
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy" updated="June 16, 2026">
       <p>
-        This Privacy Policy explains how EchoLingo (the &quot;Service&quot;) collects, uses, stores, and
+        This Privacy Policy explains how Fluvient (the &quot;Service&quot;) collects, uses, stores, and
         protects your personal information when you use it. We value your privacy and only process
         your information to the extent necessary to provide the Service. By using the Service, you
         agree to the practices described in this policy.

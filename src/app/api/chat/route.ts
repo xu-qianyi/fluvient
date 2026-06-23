@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { generateText } from "ai"
-import { createModel, getProviderFromHeader } from "@/lib/ai-provider"
+import { runWithModelFallback, getProviderFromHeader } from "@/lib/ai-provider"
 
 interface ChatMessage {
   role: "user" | "assistant"
@@ -20,8 +20,9 @@ export async function POST(req: Request) {
   if (!apiKey) return NextResponse.json({ error: "no_api_key" }, { status: 503 })
 
   try {
-    const { text } = await generateText({
-      model: createModel(apiKey, getProviderFromHeader(req)),
+    const { text } = await runWithModelFallback(apiKey, getProviderFromHeader(req), (model) =>
+      generateText({
+      model,
       maxRetries: 0,
       system: `You are a helpful AI assistant built into an English learning app for Chinese speakers.
 The user is learning English by watching videos. Help them understand the content.
@@ -32,7 +33,8 @@ The user is learning English by watching videos. Help them understand the conten
 
 ${transcript ? `Video transcript:\n${transcript.slice(0, 8000)}` : ""}`,
       messages,
-    })
+      }),
+    )
     return NextResponse.json({ message: text })
   } catch (err) {
     console.error("[chat]", err)

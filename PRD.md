@@ -1,8 +1,8 @@
-# EchoLingo — Product Requirements Document
+# Fluvient — Product Requirements Document
 
 ## 1. Product Overview
 
-EchoLingo 是一个面向中文母语用户的英语学习 web app。用户粘贴 YouTube 链接，即可在观看视频的同时看到同步字幕面板，字幕中高亮显示超出用户英语水平的词汇。用户可以点击单词查看释义、保存词汇，并获得 AI 自动生成的学习笔记。
+Fluvient 是一个面向中文母语用户的英语学习 web app。用户粘贴 YouTube 链接，即可在观看视频的同时看到同步字幕面板，字幕中高亮显示超出用户英语水平的词汇。用户可以点击单词查看释义、保存词汇，并获得 AI 自动生成的学习笔记。
 
 **核心价值**：把 YouTube 的海量英语内容变成结构化的语言学习材料，降低学习摩擦。
 

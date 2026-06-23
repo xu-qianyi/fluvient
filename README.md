@@ -1,6 +1,6 @@
-# EchoLingo
+# Fluvient
 
-Learn English by watching YouTube. EchoLingo turns any YouTube video into an
+Learn English by watching YouTube. Fluvient turns any YouTube video into an
 interactive lesson for Chinese speakers: a time-synced transcript, click-to-look-up
 vocabulary, and AI-generated study notes — all bilingual (中文 / English).
 
@@ -98,7 +98,7 @@ supabase/
 
 ## License
 
-EchoLingo is open source under the **[GNU Affero General Public License v3.0](LICENSE)**
+Fluvient is open source under the **[GNU Affero General Public License v3.0](LICENSE)**
 (AGPL-3.0).
 
 In short: you are free to use, study, modify, and redistribute this software. If you run a
